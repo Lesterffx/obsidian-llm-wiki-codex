@@ -73,6 +73,8 @@ Use project-local `templates/` first if present. Otherwise use this skill's temp
 - `assets/meeting-note.md` for meetings.
 - `assets/tool-page.md` for tool pages.
 
+For new vault initialization, use `examples/AGENTS.example.md`, `examples/index.example.md`, and `examples/log.example.md` when available; use `references/schema.md` as the fuller schema reference.
+
 Use `references/schema.md` only when initializing or repairing a vault schema. For existing vaults, the project `AGENTS.md` or `CLAUDE.md` is authoritative.
 
 ## Frontmatter And Tag Normalization

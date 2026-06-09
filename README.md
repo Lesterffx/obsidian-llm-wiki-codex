@@ -120,7 +120,17 @@ obsidian-llm-wiki-codex/
 
 ### 2. 初始化 schema
 
-可以参考 `references/schema.md` 创建项目级 `AGENTS.md`。它应该描述：
+第一次使用时，可以直接复制初始化范例到你的 Obsidian vault 根目录：
+
+```text
+examples/AGENTS.example.md  →  AGENTS.md
+examples/index.example.md   →  index.md
+examples/log.example.md     →  log.md
+```
+
+然后按自己的知识库修改 `AGENTS.md` 中的领域注册表、raw/wiki 路径和标签体系。
+
+`references/schema.md` 提供更完整的通用 schema 模板，可作为进阶参考。项目级 `AGENTS.md` 应该描述：
 
 - raw/wiki 目录结构
 - 领域注册表

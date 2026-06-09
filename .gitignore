@@ -1,0 +1,49 @@
+# Personal vault content
+raw/
+wiki/
+AGENTS.md
+CLAUDE.md
+index.md
+log.md
+
+# Local Codex / Claude state
+.codex/
+.claude/
+
+# Python runtimes and caches
+.venv/
+.runtime/
+.codex-python/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets and credentials
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*token*
+*secret*
+*credential*
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+tmp/
+temp/
+cache/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

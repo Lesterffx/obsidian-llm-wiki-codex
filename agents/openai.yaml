@@ -1,0 +1,4 @@
+interface:
+  display_name: "Obsidian LLM Wiki"
+  short_description: "维护含图片和文档预处理的 Obsidian LLM Wiki"
+  default_prompt: "Use $obsidian-llm-wiki to maintain this Obsidian LLM Wiki knowledge base."

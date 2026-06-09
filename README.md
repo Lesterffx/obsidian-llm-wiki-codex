@@ -71,6 +71,10 @@ obsidian-llm-wiki-codex/
 │   ├── book-note.md
 │   ├── meeting-note.md
 │   └── tool-page.md
+├── examples/
+│   ├── AGENTS.example.md
+│   ├── index.example.md
+│   └── log.example.md
 ├── references/
 │   └── schema.md
 ├── README.md
@@ -78,6 +82,8 @@ obsidian-llm-wiki-codex/
 ├── LICENSE
 └── .gitignore
 ```
+
+`examples/` 提供可复制到 Obsidian vault 根目录的初始化范例；`references/schema.md` 是更完整的通用 schema 参考。
 
 ## 安装方式
 

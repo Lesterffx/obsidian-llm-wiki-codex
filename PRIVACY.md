@@ -31,6 +31,7 @@ PRIVACY.md
 .gitignore
 agents/openai.yaml
 assets/*.md
+examples/*.example.md
 references/schema.md
 ```
 
@@ -42,5 +43,6 @@ references/schema.md
 
 - 只发布通用模板，不发布你的真实知识库。
 - README 中可以使用 `<你的 vault>`、`raw/<领域>/`、`wiki/<领域>/` 这类占位符。
+- 公开实战手册只使用占位符，或使用与 `examples/AGENTS.example.md` 一致的虚构领域、目录和页面名称；不要保留真实课程名、客户名、内部项目名、私人页面或本机绝对路径。
 - 真实项目规则请留在自己的 Obsidian vault 中，不要上传到公开 repo。
 - 如果不确定某个文件是否能公开，默认不要上传。

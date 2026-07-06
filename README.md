@@ -74,7 +74,8 @@ obsidian-llm-wiki-codex/
 ├── examples/
 │   ├── AGENTS.example.md
 │   ├── index.example.md
-│   └── log.example.md
+│   ├── log.example.md
+│   └── prompt-handbook.example.md
 ├── references/
 │   └── schema.md
 ├── README.md
@@ -83,7 +84,7 @@ obsidian-llm-wiki-codex/
 └── .gitignore
 ```
 
-`examples/` 提供可复制到 Obsidian vault 根目录的初始化范例；`references/schema.md` 是更完整的通用 schema 参考。
+`examples/` 提供可复制到 Obsidian vault 根目录的初始化范例，以及脱敏的实战指令手册；`references/schema.md` 是更完整的通用 schema 参考。
 
 ## 安装方式
 
@@ -133,6 +134,8 @@ examples/AGENTS.example.md  →  AGENTS.md
 examples/index.example.md   →  index.md
 examples/log.example.md     →  log.md
 ```
+
+完成初始化后，可参考 [Codex 版实战指令手册](examples/prompt-handbook.example.md) 编写 ingest、优化、图片批量分析、文档预处理、迁移和归档等任务指令。手册中的目录和页面名称与上述初始化范例保持对应，使用时替换为你自己的 vault 路径即可。
 
 然后按自己的知识库修改 `AGENTS.md` 中的领域注册表、raw/wiki 路径和标签体系。
 

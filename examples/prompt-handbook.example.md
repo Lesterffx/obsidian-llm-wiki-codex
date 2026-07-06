@@ -1,0 +1,267 @@
+---
+title: "Codex 版 obsidian-llm-wiki 实战指令手册"
+created: 2026-07-06
+updated: 2026-07-06
+domain: AI
+tags: [AI/Obsidian, 工具/Obsidian/LLM-Wiki, 工具/编程工具/Codex, type/参考]
+sources: []
+status: active
+---
+
+#AI/Obsidian #工具/Obsidian/LLM-Wiki #工具/编程工具/Codex #type/参考
+
+> 这是一份脱敏的公开实战手册范例。所有目录、页面和资料名称均与本仓库的初始化范例对应，可直接改成你自己的 vault 路径后使用。
+
+## 与初始化范例配套使用
+
+建议先把以下文件复制到 Obsidian vault 根目录并重命名：
+
+| 公开范例 | Vault 文件 | 用途 |
+|---|---|---|
+| [AGENTS.example.md](AGENTS.example.md) | `AGENTS.md` | 定义领域、目录、页面格式和安全规则 |
+| [index.example.md](index.example.md) | `index.md` | 维护 wiki 页面目录与摘要 |
+| [log.example.md](log.example.md) | `log.md` | 记录 append-only 操作日志 |
+
+完整执行规则见 [SKILL.md](../SKILL.md)，更完整的 schema 参考见 [references/schema.md](../references/schema.md)。
+
+本手册的示例路径与初始化范例保持一致：
+
+| 领域 | raw 示例 | wiki 示例 |
+|---|---|---|
+| 读书笔记 | `raw/读书笔记/示例书籍/` | `wiki/读书笔记/示例书籍笔记.md` |
+| AI | `raw/AI/示例 AI 工具课程/` | `wiki/AI/示例 AI 工具页面.md` |
+| 项目资料 | `raw/项目资料/示例项目/` | `wiki/项目资料/示例项目复盘.md` |
+| 提炼思维 | 无独立 raw 层 | `wiki/提炼思维/示例方法论.md` |
+
+## 一、怎么写好指令
+
+### 1.1 先说任务意图
+
+一条好指令先说你要 Codex 做什么，再说明范围、写入边界和特殊要求。
+
+| 意图 | 适合命令 | 重点说明 |
+|---|---|---|
+| 新资料入库 | `ingest` | raw 来源、目标领域、是否图片或文档密集 |
+| 优化已有页面 | `优化 @wiki/...` | 保留什么、追加什么、是否读图 |
+| 查询知识库 | `query` | 问题范围、希望引用哪些页面 |
+| 只读评估 | `只读评估` | 不写文件，只给规模、风险和处理策略 |
+| 提炼方法论 | `创建/优化提炼思维` | 来源页面、输出重点和复用场景 |
+| 迁移旧笔记 | `migrate` | 来源位置、目标领域、是否先只做清单 |
+| 清理页面 | `archive/remove/de-index/delete` | 优先归档或移出索引，明确是否真的删除文件 |
+
+### 1.2 已内置规则，不必反复写
+
+最新版 Skill 默认处理：
+
+- 检查并补齐 YAML frontmatter。
+- 规范化 frontmatter tags 与 inline tags，标签片段中的空格会替换为 `_`。
+- 每次执行都考虑 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否需要更新。
+- 有文件变更时按规则追加 `log.md`。
+- `raw/` 只读，不移动、不修改、不删除。
+- 优化页面时保留已有 wiki 链接和 `![[图片.png]]` 嵌入。
+
+你通常只需要补充：
+
+- 是否只读。
+- 是否保留现有正文和结构。
+- 新内容放在哪个章节或是否放在 `## 相关` 前。
+- 是否分析全部图片。
+- 是否允许 default agents 分批读图。
+- 是否允许生成或保存中间产物。
+
+### 1.3 文档预处理与图片理解分工
+
+| 任务 | 推荐方式 | 说明 |
+|---|---|---|
+| PDF/DOCX/PPTX/XLSX 文本、页序、slide 顺序和内嵌图片 | 项目 `.venv` | 做确定性预处理和 manifest |
+| 截图文字、流程图、课件图和界面图理解 | default agents | 做 OCR-like 阅读、视觉理解和洞见提炼 |
+| 大量图片分批 | 主 Codex 调度 default agents | 最多 6 个并行批次 |
+| 最终 wiki 写入 | 主 Codex | 统一格式、顺序、链接、索引和日志 |
+
+default agents 不是传统 OCR。它们更适合“可见文字读取 + 图表/流程/UI 理解 + 内容提炼”。
+
+## 二、基础命令
+
+| 命令 | 用途 |
+|---|---|
+| `ingest <source>` | 摄入 raw 新来源并创建或更新 wiki 页面 |
+| `query <问题>` | 基于现有 wiki 综合回答问题 |
+| `lint` / `audit` | 检查 frontmatter、链接、sources、孤立页面和索引 |
+| `index` | 重建或刷新知识库索引 |
+| `migrate` | 把旧笔记迁入 LLM Wiki 结构 |
+| `archive/remove/de-index/delete` | 归档、移出索引或谨慎删除 wiki 页面 |
+
+## 三、高频模板
+
+### 3.1 Ingest 新来源
+
+普通资料目录：
+
+```text
+$obsidian-llm-wiki ingest @raw/读书笔记/示例书籍/，整理为 @wiki/读书笔记/示例书籍笔记.md，并提炼核心观点、方法论、最佳实践和相关页面。
+```
+
+截图课程或图片目录：
+
+```text
+$obsidian-llm-wiki ingest @raw/AI/示例 AI 工具课程/，这是截图课程资料。按自然文件名顺序建立 image manifest；图片较多时调用 default agents 分批只读分析，输出课程结构、图片内容解析、核心观点、洞见、方法论和最佳实践。
+```
+
+### 3.2 优化已有页面
+
+允许整理页面结构：
+
+```text
+$obsidian-llm-wiki 优化 @wiki/读书笔记/示例书籍笔记.md，读取 declared sources，保留已有图片嵌入和顺序；补充资料总结、洞见、方法论提炼、最佳实践和金句精选。
+```
+
+只追加、不改原文：
+
+```text
+$obsidian-llm-wiki 优化 @wiki/项目资料/示例项目复盘.md，只追加总结和洞见到 ## 相关 前；不修改现有正文、图片嵌入和顺序。
+```
+
+### 3.3 PDF / DOCX / PPTX / XLSX
+
+```text
+$obsidian-llm-wiki ingest @raw/项目资料/示例项目/项目复盘.pptx，先用项目 .venv 提取文本、元数据、slide 顺序和图片 manifest；必要时再用 default agents 分批读图，最终整理为 @wiki/项目资料/示例项目复盘.md。
+```
+
+只做预处理评估：
+
+```text
+$obsidian-llm-wiki 只读评估 @raw/项目资料/示例项目/项目复盘.pptx，不修改任何文件；报告可提取文本、页数、图片数量、处理风险和建议工作流。
+```
+
+### 3.4 大量图片与 default agents
+
+```text
+$obsidian-llm-wiki 优化 @wiki/AI/示例 AI 工具页面.md，分析 @raw/AI/示例 AI 工具课程/ 中的全部图片。先建立 image manifest，核对顺序、缺失和重名；必要时调用最多 6 个 default agents 分批只读分析，由主 Codex 核对覆盖率并统一整合。
+```
+
+要求每张图片返回固定字段：
+
+```text
+$obsidian-llm-wiki 针对 @wiki/AI/示例 AI 工具页面.md 的图片做批量只读分析。每张图返回 manifest index、文件名、可见文字、主题、关键要点、图表或 UI 元素、洞见、置信度和无法识别内容；主 Codex 最后输出批次摘要并检查是否漏图。
+```
+
+### 3.5 Query
+
+```text
+$obsidian-llm-wiki query 这个知识库中关于 AI 工具应用与项目复盘有哪些可复用方法？请综合 [[示例 AI 工具页面]] 和 [[示例项目复盘]] 回答，并标明来源页面。
+```
+
+### 3.6 只读评估
+
+```text
+$obsidian-llm-wiki 只读评估 @raw/AI/示例 AI 工具课程/ 和 @wiki/AI/示例 AI 工具页面.md：不修改任何文件；统计文档和图片数量，检查 sources 与图片引用，判断是否需要 .venv、image manifest 或 default agents，并给出建议流程。
+```
+
+### 3.7 提炼思维
+
+```text
+$obsidian-llm-wiki 根据 [[示例书籍笔记]]、[[示例 AI 工具页面]] 和 [[示例项目复盘]]，创建 @wiki/提炼思维/示例方法论.md，提炼可复用模式、执行步骤、最佳实践、避坑指南和适用边界。
+```
+
+扩充已有方法论：
+
+```text
+$obsidian-llm-wiki 优化追加 @wiki/提炼思维/示例方法论.md，保留原有结构，把新洞见放进合适章节，并补充来源页面链接。
+```
+
+### 3.8 Lint / Audit / Index
+
+```text
+$obsidian-llm-wiki lint，检查 wiki 页面 frontmatter、inline tags、sources、图片引用、孤立页面、重复索引和失效链接；先报告问题，不自动修复。
+```
+
+```text
+$obsidian-llm-wiki index，按 AGENTS.md 的领域注册表刷新 index.md，并检查页面摘要、标签和路径是否最新。
+```
+
+### 3.9 Migrate
+
+先只读规划：
+
+```text
+$obsidian-llm-wiki migrate @旧笔记目录/，先只读评估可迁移页面、目标领域、重名和链接风险，输出迁移清单后停止。
+```
+
+明确执行目标：
+
+```text
+$obsidian-llm-wiki migrate @旧笔记目录/示例项目复盘.md 到 @wiki/项目资料/示例项目复盘.md，保留原文，补齐摘要、frontmatter、相关链接和来源；不要移动或删除 raw/。
+```
+
+### 3.10 Archive / Remove / De-index / Delete
+
+优先移出索引：
+
+```text
+$obsidian-llm-wiki 将 @wiki/项目资料/示例项目复盘.md 从 index.md 中移出，但保留文件；检查相关链接和影响范围。
+```
+
+归档页面：
+
+```text
+$obsidian-llm-wiki 归档 @wiki/项目资料/示例项目复盘.md，保留文件并将 status 改为 archived；检查索引和相关页面是否需要调整。
+```
+
+只有确定要物理删除时才使用：
+
+```text
+$obsidian-llm-wiki 删除 @wiki/项目资料/示例项目复盘.md。只处理这一份明确的 wiki 文件，不删除 raw/；删除前报告影响范围。
+```
+
+## 四、命令决策树
+
+```text
+你要做什么？
+│
+├─ 有新资料要处理
+│   ├─ 普通 raw 文档 → ingest
+│   ├─ PDF/DOCX/PPTX/XLSX → ingest + 文档预处理
+│   └─ 截图课程/大量图片 → ingest + image manifest
+│
+├─ 已有页面需要优化
+│   ├─ 可以整理结构 → 优化 @wiki/页面
+│   └─ 不改原文 → 只追加内容到 ## 相关 前
+│
+├─ 图片很多
+│   ├─ 先建立 image manifest
+│   ├─ 核对顺序、缺失和重名
+│   └─ 必要时最多 6 个 default agents 分批只读分析
+│
+├─ 只想评估 → 只读评估
+├─ 提炼跨页面方法论 → 创建或优化提炼思维
+├─ 搬迁旧笔记 → migrate，先清单后执行
+├─ 清理页面 → 优先 de-index 或 archived
+└─ 维护知识库 → query / lint / audit / index
+```
+
+## 五、最佳实践
+
+- **说清目标**：不要把 ingest、优化、迁移和删除混在一个模糊请求里。
+- **说清范围**：给出具体 `@raw/...` 或 `@wiki/...` 路径。
+- **说清写入边界**：只读、不改原文、只追加、允许重构、允许归档或删除。
+- **图片先建 manifest**：图片密集资料先明确顺序和覆盖范围。
+- **文档先预处理**：PDF/DOCX/PPTX/XLSX 先做确定性解析，再决定是否读图。
+- **主 Codex 统一收口**：default agents 只做只读分析，主 Codex 负责覆盖率、整合和写入。
+- **特殊要求才写出来**：例如只处理前 30 张图、不要调用 default agents、只报告差异。
+
+## 六、常见避坑
+
+- 不要把 default agents 当成纯 OCR；它们还负责图表、流程、界面和上下文理解。
+- 不要只写“读取全部图片”，应同时说明顺序、缺失、重名和低置信度处理要求。
+- 不要要求中间产物默认写入 `raw/`；`raw/` 是不可变来源层。
+- 不要在每条提示词中重复 frontmatter、索引和日志规则；这些属于 Skill 默认职责。
+- 不要直接物理删除 wiki 页面；大多数清理任务更适合归档或移出索引。
+
+## 相关资源
+
+- [项目 README](../README.md)
+- [Codex Skill](../SKILL.md)
+- [AGENTS 初始化范例](AGENTS.example.md)
+- [index 初始化范例](index.example.md)
+- [log 初始化范例](log.example.md)
+- [完整 schema 参考](../references/schema.md)

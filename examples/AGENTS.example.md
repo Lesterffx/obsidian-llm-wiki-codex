@@ -41,7 +41,7 @@
 
 ## Frontmatter 规范
 
-每个 wiki 页面必须以 YAML frontmatter 开头：
+每个 wiki 页面必须从第一行开始写 YAML frontmatter，以 `---` 开头：
 
 ```yaml
 ---
@@ -55,7 +55,9 @@ status: draft | active | archived
 ---
 ```
 
-新增、修改或优化任何 wiki 页面前，必须先检查 YAML frontmatter 是否存在。若不存在，必须在正文前补齐上述笔记属性；若字段缺失，必须修复缺失字段，并在内容或标签发生变化时更新 `updated`。
+新增、修改、查询、迁移、索引、审计或优化任何 wiki 页面时，必须先检查 YAML frontmatter 是否存在且字段完整。若不存在、位置不在文件第一行、或字段缺失，默认必须在正文前补齐/修复上述笔记属性，并在内容、标签或来源元数据发生变化时更新 `updated`。
+
+YAML frontmatter 属于结构维护例外。用户要求“append-only”“补充放最后”“不修改现有正文/顺序”时，这些限制只约束正文、图片、链接和补充章节，不阻止把 frontmatter 补到页面顶部。只有用户明确说“只读”“审计-only”“不要修改任何文件”时，才只报告缺口不写入。
 
 ## 标签体系
 
@@ -111,7 +113,7 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 
 ## 页面结构
 
-1. YAML frontmatter
+1. YAML frontmatter（文件第一行，以 `---` 开头）
 2. Inline tags（兼容 tag-wrangler 插件）
 3. 一句话摘要（以 `>` 引用格式）
 4. 正文内容
@@ -120,7 +122,7 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 
 ## 变更联动
 
-任何一次 LLM Wiki 操作（ingest、query、lint、migrate、index、delete/remove、optimize、提炼思维等）都必须考虑 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否保持最新。可以检查后不修改，但必须纳入判断；若本次操作产生任何文件变更，必须在 `log.md` 记录三者检查结果。
+任何一次 LLM Wiki 操作（ingest、query、lint、migrate、index、delete/remove、optimize、提炼思维等）都必须执行强制维护检查：主动检查 `AGENTS.md`、`CLAUDE.md`、`index.md` 和任务相关 wiki 页 frontmatter 是否保持最新。可以检查后不修改，但必须纳入判断；若发现结构缺口，默认修复。显式只读/审计/no-write 请求优先，此时只报告缺口。
 
 每次创建或修改 wiki 页面后，必须级联执行以下操作：
 
@@ -128,10 +130,17 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 |---|---|---|
 | 检查/更新 `AGENTS.md` | 任何 LLM Wiki 操作 | 检查领域注册表、raw/wiki 路径、处理规则、安全规则、标签规则是否需要更新 |
 | 检查/更新 `CLAUDE.md` | 任何 LLM Wiki 操作 | 检查是否需要与 `AGENTS.md` 的共享 schema 保持兼容同步 |
-| 检查/更新 `index.md` | 任何 LLM Wiki 操作；页面新增、删除、迁移、标签或摘要变化时通常需要更新 | 注册新页面、更新摘要、调整页面计数、移除或修正旧条目 |
+| 检查/更新 `index.md` | 任何 LLM Wiki 操作；页面新增、删除、迁移、标签或摘要变化时通常需要更新 | 注册新页面、更新摘要、移除或修正旧条目；修改前扫描 `wiki/**/*.md` 判定页面数量是否变化 |
 | 追加 `log.md` | 任何 wiki 变更 | 记录操作类型、变更内容、影响范围 |
 | 更新 `sources` | 新建页面 / 发现来源为空 | 指向对应的 raw 目录或文件 |
 | 更新相关 wiki 页面 | 新内容影响已有页面 | 交叉引用、修正矛盾、补充新信息 |
+
+### index.md 数量规则
+
+- 修改 `index.md` 前，先扫描 `wiki/**/*.md`，判断本次是否新增、删除、迁移或重命名 wiki Markdown 页面。
+- 如果页面数量变化，更新底部 `_统计：N 个页面 | M 个领域 | 上次更新于 YYYY-MM-DD_` 中的页面数，并在 `log.md` 记录数量变化。
+- 如果页面数量未变，不修改 page count 数字；可以按需刷新顶部维护说明和底部日期。
+- 如果扫描数量与 footer 既有数量不一致，视为统计漂移，修正为扫描值，并在 `log.md` 记录统计漂移修正。
 
 ### log.md 格式
 
@@ -146,6 +155,8 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 - `AGENTS.md`：已检查 / 已更新 / 无需更新，xxx
 - `CLAUDE.md`：已检查 / 已更新 / 无需更新，xxx
 - `index.md`：已检查 / 已更新 / 无需更新，xxx
+- frontmatter：已检查 / 已补到顶部 / 已修复字段 / 只读未写入，xxx
+- index 数量：已变化 / 未变化 / 已修正统计漂移，xxx
 ```
 
 操作类型：`ingest` | `optimize` | `lint` | `audit` | `query` | `migrate`
@@ -161,14 +172,14 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 5. 与用户讨论关键要点。
 6. 在 `wiki/<domain>/` 创建摘要页面。
 7. 用新信息更新相关已有 wiki 页面。
-8. 按变更联动规则检查/更新 `AGENTS.md`、`CLAUDE.md`、`index.md`、`sources`，并追加 `log.md`。
+8. 执行强制维护检查：检查/更新 `AGENTS.md`、`CLAUDE.md`、`index.md`、frontmatter、`sources`；若 `index.md` 变化，按数量规则处理 page count；最后追加 `log.md`。
 
 ### Query（查询）
 
 1. 读取 `index.md` 了解可用内容。
 2. 定位并读取相关 wiki 页面。
 3. 综合答案，引用 wiki 页面 `[[标题]]`。
-4. 考虑 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否存在过期风险；只读查询默认报告建议，不自动修改。
+4. 执行强制维护检查；若用户要求只读，则只报告 `AGENTS.md`、`CLAUDE.md`、`index.md` 或 frontmatter 缺口，不自动写入。
 5. 如果答案有价值，提议归档为新 wiki 页面。
 
 ### Lint（维护）
@@ -179,8 +190,8 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 4. 检查缺失的交叉引用。
 5. 验证 frontmatter 一致性。
 6. 检查 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否需要更新。
-7. 按需更新 `index.md`。
-8. 追加 lint 报告到 `log.md`。
+7. 按需更新 `index.md`；更新前扫描 `wiki/**/*.md`，确认 page count 是变化、不变还是统计漂移。
+8. 追加 lint 报告到 `log.md`，记录 frontmatter 与 index 数量检查结果。
 
 ## 限制
 

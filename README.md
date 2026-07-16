@@ -51,8 +51,11 @@ Codex 版在这个思路上做了进一步适配：它可以结合项目内 Pyth
 ## Codex 版功能特点
 
 - **AGENTS.md 优先**：更适配 Codex 项目规则；没有 `AGENTS.md` 时兼容 `CLAUDE.md`。
+- **强制维护通道**：每次执行都会主动检查 `AGENTS.md`、`CLAUDE.md`、`index.md` 和任务相关 wiki 页 frontmatter；结构缺口默认修复，显式只读时只报告。
+- **frontmatter 顶部结构例外**：YAML frontmatter 必须在页面第一行；即使用户要求“补充放最后”或“保留正文顺序”，也会把 frontmatter 作为结构元数据放回顶部。
+- **index 数量智能判定**：更新 `index.md` 前扫描 `wiki/**/*.md`；只有新增/删除/迁移/重命名 wiki Markdown 页面或发现统计漂移时才改页面数量。
 - **frontmatter 与标签规范化**：新增、修改、优化 wiki 页面时检查 YAML frontmatter；tag 中空白会规范为 `_`。
-- **schema/index freshness check**：每次执行 Skill 都考虑 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否需要更新。
+- **schema/index freshness check**：每次执行 Skill 都必须检查 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否需要更新。
 - **文档预处理运行时**：优先使用项目 `.venv` 处理 PDF、DOCX、PPTX、XLSX 的文本、页序、slide 顺序、图片 manifest。
 - **图片密集资料分析**：先建立 image manifest，再处理截图课程、PPT 截图、raw 图片目录和 wiki 图片引用。
 - **最多 6 个 default agents 批量读图**：大量图片可拆成最多 6 个并行批次，只读分析后由主 Codex 汇总。
@@ -161,11 +164,11 @@ examples/log.example.md     →  log.md
 示例：
 
 ```text
-$obsidian-llm-wiki ingest @raw/AI/某课程/
+$obsidian-llm-wiki ingest @raw/领域/示例资料目录/
 ```
 
 ```text
-$obsidian-llm-wiki query “这个知识库里关于 AI 编程出海的核心方法论是什么？”
+$obsidian-llm-wiki query “这个知识库里关于某个主题的核心方法论是什么？”
 ```
 
 ```text
@@ -187,6 +190,22 @@ $obsidian-llm-wiki ingest @raw/领域/资料目录/
 ```text
 $obsidian-llm-wiki 优化 @wiki/路径/页面.md，图片很多。请先建立 image manifest，保持图片顺序，必要时调用最多 6 个 default agents 分批只读分析。
 ```
+
+### 保留正文并追加总结
+
+```text
+$obsidian-llm-wiki 优化 @wiki/领域/示例页面.md，不修改现有正文和图片顺序；补充资料总结、洞见、方法论提炼、最佳实践和金句精选，放在最后面。
+```
+
+这类任务会保留正文和图片顺序；如果页面缺少 YAML frontmatter，Skill 仍会把 frontmatter 作为结构维护例外补到页面顶部。
+
+### 刷新索引
+
+```text
+$obsidian-llm-wiki 刷新 index.md，检查是否有新增、删除、迁移或重命名的 wiki 页面，并校验底部统计。
+```
+
+刷新索引时会先扫描 `wiki/**/*.md`。如果只是摘要、标签或路径说明变化，页面数量不变；如果实际页面数变化或 footer 统计漂移，才更新 page count 并写入 `log.md`。
 
 ### PDF / DOCX / PPTX
 
@@ -236,6 +255,8 @@ $obsidian-llm-wiki 将 @wiki/路径/页面.md 从 index.md 中移出，但不要
 - 本机绝对路径和个人目录结构。
 
 本仓库只发布通用 Skill 和模板，不包含任何个人知识库资料。
+
+公开示例应使用 `<你的 vault>`、`raw/<领域>/`、`wiki/<领域>/`、`示例页面.md` 这类占位符或虚构名称；不要把真实课程名、客户名、内部项目名、本机路径或私人页面名写入仓库。
 
 更多检查清单见 `PRIVACY.md`。
 

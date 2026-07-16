@@ -18,6 +18,22 @@ Before acting, read the vault schema:
 
 If both `AGENTS.md` and `CLAUDE.md` exist and conflict, follow `AGENTS.md` for Codex behavior and note the conflict when it affects the task.
 
+## Mandatory Maintenance Pass
+
+Every use of this skill includes a mandatory maintenance pass. The user does not need to explicitly ask to update `index.md`, repair YAML frontmatter, or sync `AGENTS.md` / `CLAUDE.md`; inspect these automatically and update structural gaps when found.
+
+Explicit user boundaries still win: if the user says read-only, audit-only, query-only, or "do not modify any files", do the same inspection but report the gaps instead of writing changes.
+
+Run this pass before finalizing any task:
+
+1. Read `AGENTS.md`, `CLAUDE.md` when present, and `index.md`.
+2. Identify the task-scoped wiki page(s). For ingest, optimize, migrate, delete/remove, and extract-thinking tasks, inspect every page being created, edited, moved, removed, or directly cited as the output. For query tasks, inspect the pages read to answer the query. For lint, audit, or index tasks, inspect the requested scope, or the full vault when no narrower scope is given.
+3. Check task-scoped wiki page YAML frontmatter for `title`, `created`, `updated`, `domain`, `tags`, `sources`, and `status`. YAML frontmatter is structural metadata and must start on the first line of the page with `---`; repair missing frontmatter, misplaced frontmatter, or missing fields unless the user explicitly forbids file changes. User requests such as "append-only", "put the new material at the end", "do not change the existing body", or "preserve order" apply to prose, images, and content sections, not to the required frontmatter position.
+4. Check `index.md` for task-scoped page additions, removals, migrations, renames, missing entries, stale paths, stale summaries, tag changes, page-count/footer drift, duplicate Markdown entries, and broken Markdown links. Before editing `index.md`, scan `wiki/**/*.md` and decide whether the operation changed the number of wiki Markdown pages. When `index.md` changes, refresh the top maintenance note and apply the Index Metadata And Statistics rules for footer date and count handling in the same edit.
+5. Check `AGENTS.md` and `CLAUDE.md` for stale or missing domain registrations, raw/wiki path registrations, workflow rules, safety rules, tag rules, and image/document processing rules that affect the current task. Keep them compatible when either one needs a structural update.
+6. If any files change, append `log.md` with the task action plus the maintenance results for `AGENTS.md`, `CLAUDE.md`, `index.md`, and frontmatter. State whether frontmatter was already valid, repaired at the top of the page, or blocked by an explicit no-write request. If `index.md` changed, state whether the wiki page count changed, stayed unchanged, or was corrected because of footer/statistics drift. If no maintenance change is needed but other files changed, log `已检查，无需更新` for each checked item.
+7. Maintenance may update structure and metadata without changing source-derived prose. Do not expand, rewrite, or reinterpret source material merely because the maintenance pass found metadata or index gaps.
+
 ## Safety Rules
 
 - Never modify, move, rename, or delete anything under `raw/`.
@@ -79,26 +95,44 @@ Use `references/schema.md` only when initializing or repairing a vault schema. F
 
 ## Frontmatter And Tag Normalization
 
-For every wiki create, update, or optimization task, check note properties before writing content:
+For every wiki create, update, query, ingest, migrate, index, lint, audit, extract-thinking, or optimization task, check task-scoped note properties as part of the Mandatory Maintenance Pass before finalizing:
 
-- Every wiki page must start with YAML frontmatter containing `title`, `created`, `updated`, `domain`, `tags`, `sources`, and `status`.
-- If frontmatter is missing, add it before the existing content. Infer conservative values from the filename, schema path, current date, declared sources, and current page state; ask only when domain or source cannot be inferred safely.
-- If frontmatter exists but fields are missing or stale, repair missing fields and update `updated` to the current date when the page content or tags change.
+- Every wiki page must start with YAML frontmatter on the first line of the file, beginning with `---`, and containing `title`, `created`, `updated`, `domain`, `tags`, `sources`, and `status`.
+- If frontmatter is missing or appears after any non-frontmatter content, add or move it before the existing content by default; no separate user approval is needed. Infer conservative values from the filename, schema path, current date, declared sources, and current page state; ask only when domain or source cannot be inferred safely.
+- If frontmatter exists but fields are missing or stale, repair missing fields by default and update `updated` to the current date when the page content, tags, or source metadata change.
+- YAML frontmatter is a structural maintenance exception. User instructions such as "append-only", "put additions at the end", "do not change existing content", or "preserve order" constrain body prose, images, links, and added sections, but they do not defer or relocate required frontmatter repair. Only explicit read-only, audit-only, query-only, or "do not modify any files" instructions block writing frontmatter changes.
 - Treat frontmatter `tags` as authoritative. When inline tags are present, make them match the normalized frontmatter tags.
-- Normalize only tag values: trim whitespace and replace internal spaces inside each tag segment with `_`. Examples: `AI Live` becomes `AI_Live`; `一堂/AI Live` becomes `一堂/AI_Live`.
-- Apply tag normalization to frontmatter `tags` and inline hashtags such as `#一堂/AI Live` or `` `#一堂/AI Live` ``.
+- Normalize only tag values: trim whitespace and replace internal spaces inside each tag segment with `_`. Examples: `AI Live` becomes `AI_Live`; `domain/AI Live` becomes `domain/AI_Live`.
+- Apply tag normalization to frontmatter `tags` and inline hashtags such as `#domain/AI Live` or `` `#domain/AI Live` ``.
 - Do not automatically rename or rewrite `domain`, `sources`, raw paths, wiki paths, directory names, filenames, page titles, wiki links, image embeds, or ordinary prose just because they contain spaces.
 
 ## Schema And Index Freshness Check
 
-Every time this skill is used, consider whether `AGENTS.md`, `CLAUDE.md`, and `index.md` remain current. They do not need to change every time, but they must be checked.
+Every time this skill is used, you must inspect and decide whether `AGENTS.md`, `CLAUDE.md`, and `index.md` remain current. They do not need to change every time, but inspection is mandatory and structural gaps should be repaired automatically unless the user explicitly forbids file changes.
 
 - Check `AGENTS.md` for domain registry, raw/wiki path registration, processing rules, safety rules, tag rules, image/document rules, and workflow changes that may need Codex-facing schema updates.
 - Check `CLAUDE.md` for shared schema content that should stay compatible with `AGENTS.md`.
 - Check `index.md` for page additions, deletions, migrations, renames, path changes, summary changes, tag changes, and stale or missing entries.
-- For read-only tasks such as query, audit, or exploratory analysis, report whether these files appear to need updates; do not modify them unless the user asks for fixes.
-- For any task that changes files, append `log.md` with the check result for all three files, even when the result is `已检查，无需更新`.
+- For query or exploratory tasks, do not rewrite source-derived content just because it was read. Do repair clear maintenance gaps found in task-scoped pages or index/schema files unless the user explicitly says read-only, audit-only, query-only, or no file changes.
+- For any task that changes files, append `log.md` with the check result for all three files and frontmatter, even when the result is `已检查，无需更新`.
 - Default agents and other subagents may help analyze content, but the main Codex agent must own this freshness check and all writes.
+
+## Index Metadata And Statistics
+
+Whenever `index.md` is created, rebuilt, refreshed, or otherwise modified, update both its header metadata and footer statistics in the same change.
+
+- Update the top note in the form `由 LLM 维护。上次更新：YYYY-MM-DD（...）`.
+- The top note must include the current date, a concise action summary, and the affected files. When many files are involved, summarize as `A.md、B.md 等 N 个 wiki 页面`.
+- Update the footer in the form `_统计：N 个页面 | M 个领域 | 上次更新于 YYYY-MM-DD_`.
+- Before editing `index.md`, scan `wiki/**/*.md` and decide whether the current operation added, deleted, migrated, or renamed wiki Markdown pages. Use this scan as the authority for page-count decisions.
+- Count pages from `wiki/**/*.md` by default. Do not count `.canvas` files, images, raw files, generated preprocessing artifacts, or other non-Markdown files as pages.
+- If the scan shows that the number of wiki Markdown pages changed, update the footer page count to the scanned value and record the count change in `log.md`.
+- If the scan shows that the number of wiki Markdown pages did not change, do not alter the footer page-count number. `index.md` may still refresh the top note and footer date when summaries, tags, paths, placements, or maintenance wording changed, but the page-count number must remain the scan-confirmed existing value.
+- If the scanned `wiki/**/*.md` count differs from the existing footer count, treat it as statistics drift. Correct the footer count to the scanned value even when the current task did not create or remove pages, and record the drift correction in `log.md`.
+- Count domains from the vault schema or domain registry by default. If the operation adds, removes, or renames a registered domain, update the domain count and schema/index wording together.
+- `.canvas` links may remain in `index.md` as explicit resource links, but they must not be included in the Markdown page count.
+- After changing `index.md`, verify that the unique Markdown wiki links in `index.md` match the scanned `wiki/**/*.md` page count, with no broken Markdown links and no duplicate Markdown entries. Explicitly recorded non-Markdown links are allowed.
+- The `log.md` entry for any operation that changes `index.md` must state that the top update note and footer date were refreshed, and must explicitly say whether the page count changed, stayed unchanged, or was corrected because of statistics drift.
 
 ## Image-Heavy Source Analysis
 
@@ -168,7 +202,7 @@ Use when the user gives a new source under `raw/`.
 7. Integrate image analysis into useful sections such as `资料总结`, `图片内容解析`, `洞见`, `方法论提炼`, `最佳实践`, and `金句精选`.
 8. Add at least two meaningful wiki links when possible.
 9. Update affected related wiki pages only when the new information materially changes cross-links, contradictions, or summaries.
-10. Check and update `AGENTS.md`, `CLAUDE.md`, and `index.md` as needed, then append `log.md` with all three freshness results.
+10. Run the Mandatory Maintenance Pass. If `index.md` changes, apply the Index Metadata And Statistics rules in the same edit. Then append `log.md` with `AGENTS.md`, `CLAUDE.md`, `index.md`, and frontmatter results plus any index metadata/statistics update result.
 11. If a top-level raw/wiki directory is not registered in the schema, report it and ask before changing schema files.
 
 ### Query
@@ -178,7 +212,7 @@ Use when the user asks a question about the knowledge base.
 1. Read `index.md` to locate candidate pages.
 2. Read the most relevant wiki pages.
 3. Synthesize the answer in Chinese and cite pages with `[[页面标题]]`.
-4. Consider whether `AGENTS.md`, `CLAUDE.md`, or `index.md` appear stale and mention material findings in the answer.
+4. Run the Mandatory Maintenance Pass for the pages and index/schema files touched by the query. If the user explicitly requested read-only or no file changes, report any maintenance gaps instead of writing them.
 5. If the answer is worth preserving, suggest archiving it as a wiki page, but do not create one without user confirmation.
 
 ### Optimize Existing Wiki Pages
@@ -190,10 +224,10 @@ Use when the user asks to optimize, reorganize, add frontmatter, add summaries, 
 3. Preserve all existing image embeds and their order.
 4. If the page contains image embeds or image-heavy sources, build an image manifest, resolve images from raw sources, and analyze coverage before writing.
 5. If default agents are used, verify every manifest index has an analysis result or an explicit unresolved note before synthesis.
-6. If the user says "不修改现有内容", append new material before `## 相关` and leave existing sections intact.
-7. Add or repair YAML frontmatter, inline tags, one-sentence summary, related links, and source citations.
-8. Add useful sections such as `资料总结`, `图片内容解析`, `洞见`, `方法论提炼`, `最佳实践`, `金句精选`, or quick-reference tables when they fit the material.
-9. Check and update `AGENTS.md`, `CLAUDE.md`, and `index.md` as needed, then append `log.md` with all three freshness results.
+6. If the user says "不修改现有内容", "补充放最后", or otherwise requests append-only body changes, preserve the existing body and section order. Add new body material at the requested location, or at the end when the user asks for end-of-file additions.
+7. Add or repair YAML frontmatter at the very top of the page as a structural maintenance exception, even during append-only body optimizations. This does not count as changing the existing body/order. Also repair inline tags, one-sentence summary, related links, and source citations when they are in scope.
+8. Add useful sections such as `资料总结`, `图片内容解析`, `洞见`, `方法论提炼`, `最佳实践`, `金句精选`, or quick-reference tables when they fit the material and the user's requested placement.
+9. Run the Mandatory Maintenance Pass. If `index.md` changes, apply the Index Metadata And Statistics rules in the same edit. Then append `log.md` with `AGENTS.md`, `CLAUDE.md`, `index.md`, and frontmatter results plus any index metadata/statistics update result.
 
 ### Extract Thinking Frameworks
 
@@ -202,23 +236,25 @@ Use when the user asks to create or expand pages under `wiki/提炼思维/`.
 1. Read all requested source wiki pages or directories.
 2. Extract reusable patterns, mental models, workflows, best practices, pitfalls, and memorable lines.
 3. Create or update a page under `wiki/提炼思维/` with no raw source layer unless the schema specifies one.
-4. Link back to the source wiki pages, check `AGENTS.md`, `CLAUDE.md`, and `index.md`, and append `log.md` with all three freshness results.
+4. Link back to the source wiki pages and run the Mandatory Maintenance Pass. If `index.md` changes, apply the Index Metadata And Statistics rules in the same edit. Append `log.md` with `AGENTS.md`, `CLAUDE.md`, `index.md`, and frontmatter results plus any index metadata/statistics update result.
 
 ### Lint Or Audit
 
 Use for health checks and maintenance.
 
-Check for missing frontmatter, mismatched inline/frontmatter tags, broken wiki links, orphan pages, empty sources, unregistered raw/wiki directories, stale pages, duplicate index entries, and contradictions across related pages. Report findings first. Only modify files if the user asks for fixes.
+Check for missing frontmatter, mismatched inline/frontmatter tags, broken wiki links, orphan pages, empty sources, unregistered raw/wiki directories, stale pages, duplicate index entries, and contradictions across related pages. Report findings first, then repair clear structural gaps by default unless the user explicitly asked for read-only/audit-only/no file changes.
 
-Also report whether `AGENTS.md`, `CLAUDE.md`, or `index.md` need updates. If the lint or audit task changes files, append `log.md` with all three freshness results.
+Also run the Mandatory Maintenance Pass. For lint or audit tasks, repair clear structural gaps by default unless the user explicitly asked for read-only/audit-only/no file changes. If the lint or audit task changes `index.md`, apply the Index Metadata And Statistics rules in the same edit. If the lint or audit task changes files, append `log.md` with `AGENTS.md`, `CLAUDE.md`, `index.md`, and frontmatter results plus any index metadata/statistics update result.
 
 ### Index
 
 Use when the user asks to rebuild or refresh `index.md`.
 
-Scan `wiki/` markdown files, read frontmatter and summary lines, group pages by schema domains, preserve useful existing organization when possible, and append a `log.md` entry if `index.md` changes.
+Scan `wiki/` markdown files, read frontmatter and summary lines, group pages by schema domains, preserve useful existing organization when possible, and apply the Index Metadata And Statistics rules whenever `index.md` changes.
 
 When rebuilding or refreshing `index.md`, also check whether scanned paths reveal missing domain registrations or stale rules in `AGENTS.md` or `CLAUDE.md`.
+
+Before finishing an index refresh, run the Mandatory Maintenance Pass for the requested index scope. Verify the scanned `wiki/**/*.md` count, the unique Markdown links in `index.md`, broken Markdown links, duplicate Markdown entries, and any explicit non-Markdown links such as `.canvas`. Append a `log.md` entry if `index.md` changes, and state that the top update note and footer date were refreshed plus whether the page count changed, stayed unchanged, or was corrected because of statistics drift.
 
 ### Migrate
 
@@ -226,7 +262,7 @@ Use for one-time migration of existing notes into the LLM Wiki structure.
 
 Identify markdown files outside `raw/` and `wiki/`, ask for domain placement when not obvious, then move by explicit user-approved paths only. Avoid bulk operations. Preserve content, add frontmatter, update links, rebuild `index.md`, and append `log.md`.
 
-Before and after migration, check `AGENTS.md`, `CLAUDE.md`, and `index.md` for path, domain, and summary freshness. Record all three results in `log.md` when files are changed.
+Before and after migration, check `AGENTS.md`, `CLAUDE.md`, and `index.md` for path, domain, and summary freshness. If `index.md` changes, apply the Index Metadata And Statistics rules in the same edit. Record all three results and any index metadata/statistics update result in `log.md` when files are changed.
 
 ### Delete Or Remove Wiki Pages
 
@@ -236,15 +272,15 @@ Use only when the user explicitly asks to delete, remove, archive, or de-index w
 2. Prefer archiving or de-indexing over deletion unless the user clearly asks for physical deletion.
 3. If a wiki file must be deleted, delete only one explicit file path at a time with the safe Windows deletion rule above.
 4. Check whether related links, backlinks, `index.md`, `AGENTS.md`, or `CLAUDE.md` need updates after the removal.
-5. Append `log.md` with the deletion/removal action and the freshness result for `AGENTS.md`, `CLAUDE.md`, and `index.md`.
+5. If `index.md` changes, apply the Index Metadata And Statistics rules in the same edit. Append `log.md` with the deletion/removal action, the freshness result for `AGENTS.md`, `CLAUDE.md`, and `index.md`, and any index metadata/statistics update result.
 
 ## Page Requirements
 
 Every wiki page should contain:
 
-1. YAML frontmatter with `title`, `created`, `updated`, `domain`, `tags`, `sources`, and `status`.
+1. YAML frontmatter as the first line/block of the file, starting with `---`, with `title`, `created`, `updated`, `domain`, `tags`, `sources`, and `status`.
 2. Inline tags matching frontmatter tags when inline tags are used.
-3. Tags normalized so spaces inside tag segments become `_`, such as `一堂/AI_Live`.
+3. Tags normalized so spaces inside tag segments become `_`, such as `domain/AI_Live`.
 4. A one-sentence summary in blockquote form.
 5. Main content.
 6. `## 相关` with meaningful wiki links.

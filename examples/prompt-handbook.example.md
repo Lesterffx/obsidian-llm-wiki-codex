@@ -56,6 +56,8 @@ status: active
 - 检查并补齐 YAML frontmatter。
 - 规范化 frontmatter tags 与 inline tags，标签片段中的空格会替换为 `_`。
 - 每次执行都考虑 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否需要更新。
+- `index.md` footer 页面数以 `indexed_page_count` 为准；`wiki_file_count` 只用于发现未收录文件、断链和重复条目。
+- 已有 wiki 文件第一次补录进 `index.md` 时，按 `补录既有页面 / first-time index backfill` 处理，footer 收录数增加；已收录页面只刷新摘要或标签时不增加。
 - 有文件变更时按规则追加 `log.md`。
 - `raw/` 只读，不移动、不修改、不删除。
 - 优化页面时保留已有 wiki 链接和 `![[图片.png]]` 嵌入。
@@ -177,6 +179,12 @@ $obsidian-llm-wiki lint，检查 wiki 页面 frontmatter、inline tags、sources
 
 ```text
 $obsidian-llm-wiki index，按 AGENTS.md 的领域注册表刷新 index.md，并检查页面摘要、标签和路径是否最新。
+```
+
+补录既有页面：
+
+```text
+$obsidian-llm-wiki index，检查 @wiki/项目资料/示例项目复盘.md 是否已收录进 index.md；如果文件存在但尚未收录，请作为补录既有页面加入索引，并按 indexed_page_count 更新 footer。
 ```
 
 ### 3.9 Migrate

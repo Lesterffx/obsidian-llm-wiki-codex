@@ -130,17 +130,18 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 |---|---|---|
 | 检查/更新 `AGENTS.md` | 任何 LLM Wiki 操作 | 检查领域注册表、raw/wiki 路径、处理规则、安全规则、标签规则是否需要更新 |
 | 检查/更新 `CLAUDE.md` | 任何 LLM Wiki 操作 | 检查是否需要与 `AGENTS.md` 的共享 schema 保持兼容同步 |
-| 检查/更新 `index.md` | 任何 LLM Wiki 操作；页面新增、删除、迁移、标签或摘要变化时通常需要更新 | 注册新页面、更新摘要、移除或修正旧条目；修改前扫描 `wiki/**/*.md` 判定页面数量是否变化 |
+| 检查/更新 `index.md` | 任何 LLM Wiki 操作；页面新增、删除、迁移、标签或摘要变化时通常需要更新 | 注册新页面、补录既有页面、更新摘要、移除或修正旧条目；修改前同时计算 `indexed_page_count`、`wiki_file_count` 和 footer count |
 | 追加 `log.md` | 任何 wiki 变更 | 记录操作类型、变更内容、影响范围 |
 | 更新 `sources` | 新建页面 / 发现来源为空 | 指向对应的 raw 目录或文件 |
 | 更新相关 wiki 页面 | 新内容影响已有页面 | 交叉引用、修正矛盾、补充新信息 |
 
 ### index.md 数量规则
 
-- 修改 `index.md` 前，先扫描 `wiki/**/*.md`，判断本次是否新增、删除、迁移或重命名 wiki Markdown 页面。
-- 如果页面数量变化，更新底部 `_统计：N 个页面 | M 个领域 | 上次更新于 YYYY-MM-DD_` 中的页面数，并在 `log.md` 记录数量变化。
-- 如果页面数量未变，不修改 page count 数字；可以按需刷新顶部维护说明和底部日期。
-- 如果扫描数量与 footer 既有数量不一致，视为统计漂移，修正为扫描值，并在 `log.md` 记录统计漂移修正。
+- 修改 `index.md` 前，先计算两个数量：`indexed_page_count`（已收录进 `index.md` 的唯一 wiki Markdown 页面数）和 `wiki_file_count`（扫描 `wiki/**/*.md` 得到的实际文件数）。
+- 底部 `_统计：N 个页面 | M 个领域 | 上次更新于 YYYY-MM-DD_` 中的页面数以 `indexed_page_count` 为准；`wiki_file_count` 只用于覆盖率、漏收录、断链和重复条目检查。
+- 如果既有 wiki 文件首次补录进 `index.md`，按 `补录既有页面` / `first-time index backfill` 处理：footer 与补录前 `indexed_page_count` 一致时页面数 +1；若 footer 已漂移，则修正为补录后的 `indexed_page_count`。
+- 如果页面已在 `index.md`，只是摘要、标签、路径或章节位置变化，不修改 page count 数字；可以按需刷新顶部维护说明和底部日期。
+- 如果 `indexed_page_count` 与 footer 既有数量不一致，视为统计漂移，修正为 `indexed_page_count`，并在 `log.md` 记录 `统计漂移修正`。
 
 ### log.md 格式
 
@@ -156,7 +157,7 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 - `CLAUDE.md`：已检查 / 已更新 / 无需更新，xxx
 - `index.md`：已检查 / 已更新 / 无需更新，xxx
 - frontmatter：已检查 / 已补到顶部 / 已修复字段 / 只读未写入，xxx
-- index 数量：已变化 / 未变化 / 已修正统计漂移，xxx
+- index 数量：`wiki_file_count` = N；`indexed_page_count` = M；footer count = K；已变化 / 未变化 / 已修正统计漂移，xxx
 ```
 
 操作类型：`ingest` | `optimize` | `lint` | `audit` | `query` | `migrate`
@@ -172,7 +173,7 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 5. 与用户讨论关键要点。
 6. 在 `wiki/<domain>/` 创建摘要页面。
 7. 用新信息更新相关已有 wiki 页面。
-8. 执行强制维护检查：检查/更新 `AGENTS.md`、`CLAUDE.md`、`index.md`、frontmatter、`sources`；若 `index.md` 变化，按数量规则处理 page count；最后追加 `log.md`。
+8. 执行强制维护检查：检查/更新 `AGENTS.md`、`CLAUDE.md`、`index.md`、frontmatter、`sources`；若 `index.md` 变化，按 `indexed_page_count` / `wiki_file_count` 数量规则处理 page count；最后追加 `log.md`。
 
 ### Query（查询）
 
@@ -190,7 +191,7 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 4. 检查缺失的交叉引用。
 5. 验证 frontmatter 一致性。
 6. 检查 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否需要更新。
-7. 按需更新 `index.md`；更新前扫描 `wiki/**/*.md`，确认 page count 是变化、不变还是统计漂移。
+7. 按需更新 `index.md`；更新前计算 `indexed_page_count`、`wiki_file_count` 和 footer count，检查未收录文件、断链、重复条目和统计漂移。
 8. 追加 lint 报告到 `log.md`，记录 frontmatter 与 index 数量检查结果。
 
 ## 限制

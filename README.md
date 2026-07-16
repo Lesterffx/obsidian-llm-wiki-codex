@@ -53,7 +53,7 @@ Codex 版在这个思路上做了进一步适配：它可以结合项目内 Pyth
 - **AGENTS.md 优先**：更适配 Codex 项目规则；没有 `AGENTS.md` 时兼容 `CLAUDE.md`。
 - **强制维护通道**：每次执行都会主动检查 `AGENTS.md`、`CLAUDE.md`、`index.md` 和任务相关 wiki 页 frontmatter；结构缺口默认修复，显式只读时只报告。
 - **frontmatter 顶部结构例外**：YAML frontmatter 必须在页面第一行；即使用户要求“补充放最后”或“保留正文顺序”，也会把 frontmatter 作为结构元数据放回顶部。
-- **index 数量智能判定**：更新 `index.md` 前扫描 `wiki/**/*.md`；只有新增/删除/迁移/重命名 wiki Markdown 页面或发现统计漂移时才改页面数量。
+- **index 收录数量智能判定**：更新 `index.md` 前同时计算 `indexed_page_count` 与 `wiki_file_count`；底部页面数代表已收录进 index 的 wiki Markdown 页面数，文件扫描数用于发现漏收录和断链。
 - **frontmatter 与标签规范化**：新增、修改、优化 wiki 页面时检查 YAML frontmatter；tag 中空白会规范为 `_`。
 - **schema/index freshness check**：每次执行 Skill 都必须检查 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否需要更新。
 - **文档预处理运行时**：优先使用项目 `.venv` 处理 PDF、DOCX、PPTX、XLSX 的文本、页序、slide 顺序、图片 manifest。
@@ -205,7 +205,9 @@ $obsidian-llm-wiki 优化 @wiki/领域/示例页面.md，不修改现有正文�
 $obsidian-llm-wiki 刷新 index.md，检查是否有新增、删除、迁移或重命名的 wiki 页面，并校验底部统计。
 ```
 
-刷新索引时会先扫描 `wiki/**/*.md`。如果只是摘要、标签或路径说明变化，页面数量不变；如果实际页面数变化或 footer 统计漂移，才更新 page count 并写入 `log.md`。
+刷新索引时会先扫描 `wiki/**/*.md`，同时读取 `index.md` 现有条目，区分已收录、文件存在但未收录、以及 index 断链。底部 page count 代表 `indexed_page_count`，也就是已收录进 index 的 wiki Markdown 页面数；`wiki_file_count` 只用于覆盖率检查。
+
+如果只是摘要、标签或路径说明变化，页面数量不变。若已有 `wiki/示例页面.md` 第一次补录进 `index.md`，本次按 `补录既有页面 / first-time index backfill` 处理，footer 页面数按收录数增加 1。若 footer 与实际收录数不一致，则按 `indexed_page_count` 做统计漂移修正并写入 `log.md`。
 
 ### PDF / DOCX / PPTX
 

@@ -55,10 +55,10 @@ status: active
 
 - 检查并补齐 YAML frontmatter。
 - 规范化 frontmatter tags 与 inline tags，标签片段中的空格会替换为 `_`。
-- 每次执行都考虑 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否需要更新。
-- `index.md` footer 页面数以 `indexed_page_count` 为准；`wiki_file_count` 只用于发现未收录文件、断链和重复条目。
-- 已有 wiki 文件第一次补录进 `index.md` 时，按 `补录既有页面 / first-time index backfill` 处理，footer 收录数增加；已收录页面只刷新摘要或标签时不增加。
-- 有文件变更时按规则追加 `log.md`。
+- 每次执行都考虑 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否需要更新，并按 vault 声明处理两个 schema 入口的关系。
+- `index.md` 同时维护 `indexed_page_count`、`wiki_file_count`、`registered_domain_count`，以及 `missing_count`、`broken_count`、`duplicate_count`。
+- 已有 wiki 文件第一次补录进 `index.md` 时按 `补录既有页面 / first-time index backfill` 处理；统计漂移时重新计算全部六项变量，不在旧数字上盲目递增。
+- 有文件变更时按规则追加 `log.md`；大日志只读取末尾 80 行，必要时最多 200 行，并通过唯一 EOF 锚点、`apply_patch` 和旧内容前缀哈希验证 append-only。
 - `raw/` 只读，不移动、不修改、不删除。
 - 优化页面时保留已有 wiki 链接和 `![[图片.png]]` 嵌入。
 
@@ -77,7 +77,7 @@ status: active
 |---|---|---|
 | PDF/DOCX/PPTX/XLSX 文本、页序、slide 顺序和内嵌图片 | 项目 `.venv` | 做确定性预处理和 manifest |
 | 截图文字、流程图、课件图和界面图理解 | default agents | 做 OCR-like 阅读、视觉理解和洞见提炼 |
-| 大量图片分批 | 主 Codex 调度 default agents | 最多 6 个并行批次 |
+| 大量图片分批 | 主 Codex 调度 default agents | 最多 6 个总批次；并发不足时分波执行 |
 | 最终 wiki 写入 | 主 Codex | 统一格式、顺序、链接、索引和日志 |
 
 default agents 不是传统 OCR。它们更适合“可见文字读取 + 图表/流程/UI 理解 + 内容提炼”。
@@ -138,7 +138,7 @@ $obsidian-llm-wiki 只读评估 @raw/项目资料/示例项目/项目复盘.pptx
 ### 3.4 大量图片与 default agents
 
 ```text
-$obsidian-llm-wiki 优化 @wiki/AI/示例 AI 工具页面.md，分析 @raw/AI/示例 AI 工具课程/ 中的全部图片。先建立 image manifest，核对顺序、缺失和重名；必要时调用最多 6 个 default agents 分批只读分析，由主 Codex 核对覆盖率并统一整合。
+$obsidian-llm-wiki 优化 @wiki/AI/示例 AI 工具页面.md，分析 @raw/AI/示例 AI 工具课程/ 中的全部图片。先建立 image manifest，核对顺序、缺失和重名；拆成不超过 6 个总批次，并按可用并发槽分波调用 default agents 只读分析，由主 Codex 核对覆盖率并统一整合。
 ```
 
 要求每张图片返回固定字段：
@@ -178,13 +178,13 @@ $obsidian-llm-wiki lint，检查 wiki 页面 frontmatter、inline tags、sources
 ```
 
 ```text
-$obsidian-llm-wiki index，按 AGENTS.md 的领域注册表刷新 index.md，并检查页面摘要、标签和路径是否最新。
+$obsidian-llm-wiki index，按 vault schema 的领域注册表刷新 index.md，检查页面摘要、标签和路径，并重新计算三项权威变量与三项健康变量。
 ```
 
 补录既有页面：
 
 ```text
-$obsidian-llm-wiki index，检查 @wiki/项目资料/示例项目复盘.md 是否已收录进 index.md；如果文件存在但尚未收录，请作为补录既有页面加入索引，并按 indexed_page_count 更新 footer。
+$obsidian-llm-wiki index，检查 @wiki/项目资料/示例项目复盘.md 是否已收录进 index.md；如果文件存在但尚未收录，请作为补录既有页面加入索引，并刷新三项权威变量、三项健康变量、footer 和索引健康行。
 ```
 
 ### 3.9 Migrate
@@ -238,7 +238,7 @@ $obsidian-llm-wiki 删除 @wiki/项目资料/示例项目复盘.md。只处理�
 ├─ 图片很多
 │   ├─ 先建立 image manifest
 │   ├─ 核对顺序、缺失和重名
-│   └─ 必要时最多 6 个 default agents 分批只读分析
+│   └─ 最多 6 个总批次，并按可用并发槽分波只读分析
 │
 ├─ 只想评估 → 只读评估
 ├─ 提炼跨页面方法论 → 创建或优化提炼思维

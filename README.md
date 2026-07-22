@@ -21,14 +21,14 @@ LLM Wiki 的做法不同：LLM **持续构建和维护一个持久化的 wiki** 
 - 交叉引用、摘要、矛盾、来源和操作记录都可以被持续维护。
 - Obsidian 成为人类阅读和浏览知识网络的前端，Codex 成为维护 wiki 的执行者。
 
-Codex 版在这个思路上做了进一步适配：它可以结合项目内 Python 虚拟环境做 PDF/DOCX/PPTX 等文档预处理，也可以通过 image manifest 和最多 6 个 default agents 分批分析大量图片、截图课程和 PPT 页面。主 Codex 负责核对覆盖率、整合结果、写入 wiki、维护索引和追加日志。
+Codex 版在这个思路上做了进一步适配：它可以结合项目内 Python 虚拟环境做 PDF/DOCX/PPTX 等文档预处理，也可以通过 image manifest 将大量图片、截图课程和 PPT 页面拆成最多 6 个连续批次；运行时并发不足时按波次执行。主 Codex 负责核对覆盖率、整合结果、写入 wiki、维护索引和安全追加日志。
 
 ## 三层架构设计
 
 ```text
 ┌─────────────────────────────────────────┐
 │ Schema                                  │
-│ AGENTS.md 优先；缺失时兼容 CLAUDE.md     │
+│ AGENTS.md / CLAUDE.md 双入口关系          │
 │ 领域注册表、命名约定、工作流、安全规则    │
 ├─────────────────────────────────────────┤
 │ wiki/                                   │
@@ -43,22 +43,23 @@ Codex 版在这个思路上做了进一步适配：它可以结合项目内 Pyth
 
 - `raw/`：不可变原始资料层。Codex 只读取，绝不修改、移动或删除。
 - `wiki/`：LLM 维护的知识层。Codex 可以创建、优化、迁移、归档页面，并维护链接和来源。
-- `AGENTS.md`：Codex 优先读取的项目 schema，定义领域、目录、frontmatter、标签、工作流和安全规则。
-- `CLAUDE.md`：可选兼容文件。如果项目没有 `AGENTS.md`，Skill 会回退读取 `CLAUDE.md`。
+- `AGENTS.md`：Codex 项目 schema，定义领域、目录、frontmatter、标签、工作流和安全规则。
+- `CLAUDE.md`：可选兼容入口。两个文件同时存在时，Skill 会按 vault 声明的关系处理；若声明为完全相同的双入口，则同步修改并校验 SHA-256。
 - `index.md`：知识库目录，由 LLM 按 wiki 当前状态维护。
 - `log.md`：操作日志，append-only。
 
 ## Codex 版功能特点
 
-- **AGENTS.md 优先**：更适配 Codex 项目规则；没有 `AGENTS.md` 时兼容 `CLAUDE.md`。
+- **Schema 双入口契约**：读取现有 `AGENTS.md` 与 `CLAUDE.md`；若 vault 声明两者完全相同，则保持字节一致并校验 SHA-256，否则保留有意的运行时差异。
 - **强制维护通道**：每次执行都会主动检查 `AGENTS.md`、`CLAUDE.md`、`index.md` 和任务相关 wiki 页 frontmatter；结构缺口默认修复，显式只读时只报告。
 - **frontmatter 顶部结构例外**：YAML frontmatter 必须在页面第一行；即使用户要求“补充放最后”或“保留正文顺序”，也会把 frontmatter 作为结构元数据放回顶部。
-- **index 收录数量智能判定**：更新 `index.md` 前同时计算 `indexed_page_count` 与 `wiki_file_count`；底部页面数代表已收录进 index 的 wiki Markdown 页面数，文件扫描数用于发现漏收录和断链。
+- **六变量索引健康检查**：更新 `index.md` 前计算 `indexed_page_count`、`wiki_file_count`、`registered_domain_count`，以及 `missing_count`、`broken_count`、`duplicate_count`，统一刷新 footer 与索引健康行。
 - **frontmatter 与标签规范化**：新增、修改、优化 wiki 页面时检查 YAML frontmatter；tag 中空白会规范为 `_`。
 - **schema/index freshness check**：每次执行 Skill 都必须检查 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否需要更新。
 - **文档预处理运行时**：优先使用项目 `.venv` 处理 PDF、DOCX、PPTX、XLSX 的文本、页序、slide 顺序、图片 manifest。
 - **图片密集资料分析**：先建立 image manifest，再处理截图课程、PPT 截图、raw 图片目录和 wiki 图片引用。
-- **最多 6 个 default agents 批量读图**：大量图片可拆成最多 6 个并行批次，只读分析后由主 Codex 汇总。
+- **最多 6 个总批次读图**：大量图片拆成不超过 6 个连续批次；并发槽不足时分波执行，只读分析后由主 Codex 汇总。
+- **大体积日志安全追加**：`log.md` 默认只读取末尾 80 行，必要时最多 200 行；通过唯一 EOF 锚点、`apply_patch`、去重和旧内容前缀哈希证明 append-only。
 - **migrate / delete / remove / de-index 工作流**：支持旧笔记迁移、页面归档、移出索引和谨慎删除。
 - **Windows / PowerShell 安全规则**：避免依赖系统 Python，避免批量删除和递归删除。
 
@@ -126,7 +127,7 @@ obsidian-llm-wiki-codex/
     └── <领域>/
 ```
 
-如果你已经有 Claude Code 版 `CLAUDE.md`，可以先继续兼容使用；Codex 版更推荐逐步迁移或同步一份 `AGENTS.md`。
+如果你已经有 Claude Code 版 `CLAUDE.md`，可以继续兼容使用；若同时维护 `AGENTS.md`，请在 vault schema 中声明两者是字节一致的双入口，还是允许保留运行时差异。
 
 ### 2. 初始化 schema
 
@@ -188,7 +189,7 @@ $obsidian-llm-wiki ingest @raw/领域/资料目录/
 ### 图片密集资料
 
 ```text
-$obsidian-llm-wiki 优化 @wiki/路径/页面.md，图片很多。请先建立 image manifest，保持图片顺序，必要时调用最多 6 个 default agents 分批只读分析。
+$obsidian-llm-wiki 优化 @wiki/路径/页面.md，图片很多。请先建立 image manifest，保持图片顺序，拆成不超过 6 个总批次；并发不足时按波次调用 default agents 只读分析。
 ```
 
 ### 保留正文并追加总结
@@ -205,9 +206,15 @@ $obsidian-llm-wiki 优化 @wiki/领域/示例页面.md，不修改现有正文�
 $obsidian-llm-wiki 刷新 index.md，检查是否有新增、删除、迁移或重命名的 wiki 页面，并校验底部统计。
 ```
 
-刷新索引时会先扫描 `wiki/**/*.md`，同时读取 `index.md` 现有条目，区分已收录、文件存在但未收录、以及 index 断链。底部 page count 代表 `indexed_page_count`，也就是已收录进 index 的 wiki Markdown 页面数；`wiki_file_count` 只用于覆盖率检查。
+刷新索引时会先扫描 `wiki/**/*.md`，同时读取 `index.md` 现有条目，分别计算三项权威变量：`indexed_page_count`、`wiki_file_count`、`registered_domain_count`；再计算三项健康变量：`missing_count`、`broken_count`、`duplicate_count`。`.canvas`、示例占位和 `raw/...` 来源链接不计入 Wiki Markdown 页面数。
 
-如果只是摘要、标签或路径说明变化，页面数量不变。若已有 `wiki/示例页面.md` 第一次补录进 `index.md`，本次按 `补录既有页面 / first-time index backfill` 处理，footer 页面数按收录数增加 1。若 footer 与实际收录数不一致，则按 `indexed_page_count` 做统计漂移修正并写入 `log.md`。
+footer 同时展示已索引页面数、实际 Wiki 文件数和注册领域数，下一行展示未收录、Markdown 断链和重复条目。若已有 `wiki/示例页面.md` 第一次补录进 `index.md`，按 `补录既有页面 / first-time index backfill` 处理；旧 footer 失真时重新计算全部六项变量并记录 `统计漂移修正`，不得在旧数字上盲目递增。
+
+```markdown
+_统计：{indexed_page_count} 个已索引页面 | {wiki_file_count} 个 Wiki 文件 | {registered_domain_count} 个注册领域 | 上次更新于 YYYY-MM-DD_
+
+> 索引健康：未收录 {missing_count} | Markdown 断链 {broken_count} | 重复条目 {duplicate_count}；`.canvas`、示例占位和 `raw/...` 链接不计入页面数。
+```
 
 ### PDF / DOCX / PPTX
 
@@ -238,10 +245,10 @@ $obsidian-llm-wiki 将 @wiki/路径/页面.md 从 index.md 中移出，但不要
 | 项目 | Claude Code 版 | Codex 版 |
 |---|---|---|
 | 仓库 | `Lesterffx/obsidian-llm-wiki` | `Lesterffx/obsidian-llm-wiki-codex` |
-| 主要 schema | `CLAUDE.md` | `AGENTS.md` 优先，缺失时兼容 `CLAUDE.md` |
+| 主要 schema | `CLAUDE.md` | 读取 `AGENTS.md` / `CLAUDE.md`，按 vault 声明处理双入口关系 |
 | Agent 能力 | Claude Code 工作流 | Codex 主 agent + default agents 批量图片分析 |
 | 文档预处理 | 以 Claude 工作流为主 | 支持项目 `.venv` 做确定性预处理 |
-| 图片处理 | 保留图片引用，按需分析 | image manifest + 最多 6 个 default agents |
+| 图片处理 | 保留图片引用，按需分析 | image manifest + 最多 6 个总批次，必要时分波执行 |
 | 适用环境 | Claude Code | Codex / Codex App |
 
 ## 隐私与安全

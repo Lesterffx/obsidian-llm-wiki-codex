@@ -32,3 +32,11 @@
 | 页面 | 摘要 | 标签 |
 |---|---|---|
 | [[示例方法论]] | 这里写从多篇资料中提炼出的通用方法论摘要。 | `#type/方法论` `#type/思维` |
+
+---
+
+_统计：{indexed_page_count} 个已索引页面 | {wiki_file_count} 个 Wiki 文件 | {registered_domain_count} 个注册领域 | 上次更新于 YYYY-MM-DD_
+
+> 索引健康：未收录 {missing_count} | Markdown 断链 {broken_count} | 重复条目 {duplicate_count}；`.canvas`、示例占位和 `raw/...` 链接不计入页面数。
+
+> 复制本示例后，请由 Skill 根据当前 vault 实际扫描结果替换所有 `{...}` 占位变量，不要手工沿用示例数字。

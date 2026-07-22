@@ -17,10 +17,14 @@
   - `wiki/AI/` — AI 工具、教程、实践经验和知识总结。
   - `wiki/项目资料/` — 项目复盘、需求分析、会议总结和执行文档。
   - `wiki/提炼思维/` — 从多篇资料中提炼的通用方法论、思维模型和最佳实践。
-- **AGENTS.md** — Codex 优先读取的项目 schema。
-- **CLAUDE.md** — Claude Code 兼容 schema（可选）。
+- **AGENTS.md** — Codex 项目 schema 入口。
+- **CLAUDE.md** — 可选兼容入口。本示例默认允许保留运行时差异；如果声明两份完全相同，结构修改后必须同步并校验 SHA-256。
 - **index.md** — 内容目录（LLM 维护）。
 - **log.md** — 操作日志（append-only）。
+
+## Schema 入口关系
+
+本示例默认 `AGENTS.md` 是 Codex 规则入口，`CLAUDE.md` 可保留有意的运行时差异；共享的领域、路径、frontmatter、标签、图片、索引和安全规则必须兼容。如果改为“两份完全相同”，修改任一文件时必须同步另一文件，并在写入后校验 SHA-256 相同。
 
 ## 领域注册表
 
@@ -95,9 +99,9 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 
 - 适用于截图课程、PPT 截图、raw 图片目录、wiki 页面图片嵌入、以及 PDF/DOCX/PPTX 中抽取出的页面或图片。
 - 主 Codex 负责建立 manifest、分批、校验覆盖率、整合分析结果和最终写入 wiki。
-- 图片少量时可由主 Codex 直接读取分析；图片较多时可调用内置 `default` agents 并行分析。
+- 图片少量时由主 Codex 直接分析；图片较多时可调用内置 `default` agents 分批分析。
 - `default` agents 只读图片并返回分析结果，不修改 `raw/`、`wiki/`、`index.md`、`log.md` 或 schema 文件。
-- 最多并行 6 个 default agent 批次；100 张以上图片先拆成最多 6 个批次，必要时再继续分批。
+- 1–10 张由主 Codex 分析；11–30 张拆成 2–3 批；31 张以上拆成不超过 6 个总批次。并发槽不足时按波次执行，不再增加批次数。
 
 ## 文档预处理运行时
 
@@ -113,12 +117,9 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 
 ## 页面结构
 
-1. YAML frontmatter（文件第一行，以 `---` 开头）
-2. Inline tags（兼容 tag-wrangler 插件）
-3. 一句话摘要（以 `>` 引用格式）
-4. 正文内容
-5. `## 相关` — wiki 链接到相关页面
-6. `## 来源` — 引用 raw 来源
+必需结构：YAML frontmatter 位于文件第一行；存在 inline tags 时与 frontmatter 一致；标签片段中的空格规范为 `_`。
+
+按资料类型和任务范围选用一句话摘要、正文、`## 相关` 与 `## 来源`。不要为了套模板而扩写只读查询或轻量维护任务。
 
 ## 变更联动
 
@@ -129,19 +130,20 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 | 操作 | 触发条件 | 说明 |
 |---|---|---|
 | 检查/更新 `AGENTS.md` | 任何 LLM Wiki 操作 | 检查领域注册表、raw/wiki 路径、处理规则、安全规则、标签规则是否需要更新 |
-| 检查/更新 `CLAUDE.md` | 任何 LLM Wiki 操作 | 检查是否需要与 `AGENTS.md` 的共享 schema 保持兼容同步 |
-| 检查/更新 `index.md` | 任何 LLM Wiki 操作；页面新增、删除、迁移、标签或摘要变化时通常需要更新 | 注册新页面、补录既有页面、更新摘要、移除或修正旧条目；修改前同时计算 `indexed_page_count`、`wiki_file_count` 和 footer count |
+| 检查/更新 `CLAUDE.md` | 任何 LLM Wiki 操作 | 按 vault 声明保持字节一致，或保留有意的运行时差异 |
+| 检查/更新 `index.md` | 任何 LLM Wiki 操作；页面新增、删除、迁移、标签或摘要变化时通常需要更新 | 注册、补录或修正条目；修改前计算三项权威变量和三项健康变量 |
 | 追加 `log.md` | 任何 wiki 变更 | 记录操作类型、变更内容、影响范围 |
 | 更新 `sources` | 新建页面 / 发现来源为空 | 指向对应的 raw 目录或文件 |
 | 更新相关 wiki 页面 | 新内容影响已有页面 | 交叉引用、修正矛盾、补充新信息 |
 
 ### index.md 数量规则
 
-- 修改 `index.md` 前，先计算两个数量：`indexed_page_count`（已收录进 `index.md` 的唯一 wiki Markdown 页面数）和 `wiki_file_count`（扫描 `wiki/**/*.md` 得到的实际文件数）。
-- 底部 `_统计：N 个页面 | M 个领域 | 上次更新于 YYYY-MM-DD_` 中的页面数以 `indexed_page_count` 为准；`wiki_file_count` 只用于覆盖率、漏收录、断链和重复条目检查。
-- 如果既有 wiki 文件首次补录进 `index.md`，按 `补录既有页面` / `first-time index backfill` 处理：footer 与补录前 `indexed_page_count` 一致时页面数 +1；若 footer 已漂移，则修正为补录后的 `indexed_page_count`。
-- 如果页面已在 `index.md`，只是摘要、标签、路径或章节位置变化，不修改 page count 数字；可以按需刷新顶部维护说明和底部日期。
-- 如果 `indexed_page_count` 与 footer 既有数量不一致，视为统计漂移，修正为 `indexed_page_count`，并在 `log.md` 记录 `统计漂移修正`。
+- 修改 `index.md` 前计算三项权威变量：`indexed_page_count`、`wiki_file_count`、`registered_domain_count`。
+- 同次扫描计算三项健康变量：`missing_count`、`broken_count`、`duplicate_count`。
+- footer 使用：`_统计：{indexed_page_count} 个已索引页面 | {wiki_file_count} 个 Wiki 文件 | {registered_domain_count} 个注册领域 | 上次更新于 YYYY-MM-DD_`。
+- 健康行使用：`> 索引健康：未收录 {missing_count} | Markdown 断链 {broken_count} | 重复条目 {duplicate_count}；.canvas、示例占位和 raw/... 链接不计入页面数。`
+- 既有文件首次收录按 `补录既有页面` 处理；旧统计失真时重新计算全部六项变量并记录 `统计漂移修正`，不得盲目递增。
+- 修改后确认 footer 和健康行各出现一次；`.canvas`、图片、附件、外链、schema、示例占位与 `raw/...` 来源不计入 Wiki Markdown 页面数。
 
 ### log.md 格式
 
@@ -157,8 +159,10 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 - `CLAUDE.md`：已检查 / 已更新 / 无需更新，xxx
 - `index.md`：已检查 / 已更新 / 无需更新，xxx
 - frontmatter：已检查 / 已补到顶部 / 已修复字段 / 只读未写入，xxx
-- index 数量：`wiki_file_count` = N；`indexed_page_count` = M；footer count = K；已变化 / 未变化 / 已修正统计漂移，xxx
+- index 统计：`indexed_page_count` = N；`wiki_file_count` = N；`registered_domain_count` = N；`missing_count` = N；`broken_count` = N；`duplicate_count` = N；已变化 / 未变化 / 已修正统计漂移，xxx
 ```
+
+`log.md` 过大时只读取末尾 80 行，必要时最多 200 行。追加前检查重复标题、文件长度、SHA-256、末尾内容和更新时间；使用唯一 EOF 锚点通过 `apply_patch` 一次追加。追加后验证旧内容前缀哈希不变。禁止用 `Set-Content`、整文件替换、`>>` 或 `Add-Content` 改写日志。
 
 操作类型：`ingest` | `optimize` | `lint` | `audit` | `query` | `migrate`
 
@@ -168,12 +172,12 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 
 1. 确认来源文件已放入 `raw/<domain>/` 对应目录。
 2. PDF/DOCX/PPTX/XLSX 或大量图片资料，先做确定性预处理并建立 manifest。
-3. 图片密集资料按 image manifest 分析；必要时调用最多 6 个 default agent 批次做只读图片理解。
+3. 图片密集资料按 image manifest 分析；必要时拆成不超过 6 个总批次，并按可用并发槽分波调用 default agents 做只读图片理解。
 4. 阅读/分析来源，并核对 manifest 覆盖率、顺序、缺失和重名问题。
 5. 与用户讨论关键要点。
 6. 在 `wiki/<domain>/` 创建摘要页面。
 7. 用新信息更新相关已有 wiki 页面。
-8. 执行强制维护检查：检查/更新 `AGENTS.md`、`CLAUDE.md`、`index.md`、frontmatter、`sources`；若 `index.md` 变化，按 `indexed_page_count` / `wiki_file_count` 数量规则处理 page count；最后追加 `log.md`。
+8. 执行强制维护检查：检查/更新 `AGENTS.md`、`CLAUDE.md`、`index.md`、frontmatter、`sources`；若 `index.md` 变化，重新计算三项权威变量和三项健康变量；最后安全追加 `log.md`。
 
 ### Query（查询）
 
@@ -191,7 +195,7 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 4. 检查缺失的交叉引用。
 5. 验证 frontmatter 一致性。
 6. 检查 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否需要更新。
-7. 按需更新 `index.md`；更新前计算 `indexed_page_count`、`wiki_file_count` 和 footer count，检查未收录文件、断链、重复条目和统计漂移。
+7. 按需更新 `index.md`；更新前计算三项权威变量和三项健康变量，检查未收录文件、断链、重复条目和统计漂移。
 8. 追加 lint 报告到 `log.md`，记录 frontmatter 与 index 数量检查结果。
 
 ## 限制
@@ -199,6 +203,7 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 - 绝不修改 `raw/` 下的文件。
 - 覆盖已有 wiki 内容前须确认。
 - `log.md` 条目 append-only，不删除已有条目。
+- 大日志只做定量 tail 读取与安全补丁追加，不整文件读取或重写。
 - 不确定时提问，不猜测。
 - 保持中文为主要内容语言。
 - 不破坏已有 wiki 链接。

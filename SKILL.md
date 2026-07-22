@@ -11,12 +11,11 @@ Use this skill to maintain an Obsidian knowledge base where `raw/` is the immuta
 
 Before acting, read the vault schema:
 
-1. Prefer `AGENTS.md` in the vault root.
-2. If `AGENTS.md` is absent, read `CLAUDE.md`.
-3. Read `index.md` before answering knowledge queries or choosing related pages.
-4. Read `log.md` only when recent changes, history, or operation format matters.
-
-If both `AGENTS.md` and `CLAUDE.md` exist and conflict, follow `AGENTS.md` for Codex behavior and note the conflict when it affects the task.
+1. Read `AGENTS.md` when it exists.
+2. Read `CLAUDE.md` when it exists. If the vault declares that both schema files are identical entrypoints, treat byte equality as a project contract: verify both files, apply the shared rules plus only the current runtime adapter, and synchronize both files in the same edit when structural changes are required. Verify SHA-256 equality after writing.
+3. If the vault does not declare an identical-file contract and the two schema files conflict, follow `AGENTS.md` for Codex behavior and note any task-relevant conflict.
+4. Read `index.md` before answering knowledge queries or choosing related pages.
+5. Inspect `log.md` only when recent changes, history, or operation format matters. Use the bounded-tail workflow in Large Append-Only Logs; do not read the whole file merely to obtain an append anchor.
 
 ## Mandatory Maintenance Pass
 
@@ -29,9 +28,9 @@ Run this pass before finalizing any task:
 1. Read `AGENTS.md`, `CLAUDE.md` when present, and `index.md`.
 2. Identify the task-scoped wiki page(s). For ingest, optimize, migrate, delete/remove, and extract-thinking tasks, inspect every page being created, edited, moved, removed, or directly cited as the output. For query tasks, inspect the pages read to answer the query. For lint, audit, or index tasks, inspect the requested scope, or the full vault when no narrower scope is given.
 3. Check task-scoped wiki page YAML frontmatter for `title`, `created`, `updated`, `domain`, `tags`, `sources`, and `status`. YAML frontmatter is structural metadata and must start on the first line of the page with `---`; repair missing frontmatter, misplaced frontmatter, or missing fields unless the user explicitly forbids file changes. User requests such as "append-only", "put the new material at the end", "do not change the existing body", or "preserve order" apply to prose, images, and content sections, not to the required frontmatter position.
-4. Check `index.md` for task-scoped page additions, removals, migrations, renames, missing entries, stale paths, stale summaries, tag changes, page-count/footer drift, duplicate Markdown entries, and broken Markdown links. Before editing `index.md`, scan `wiki/**/*.md`, read current `index.md` entries, and compute `wiki_file_count`, `indexed_page_count`, and the existing footer count. Determine each task-scoped page state: already indexed, file exists but is not indexed, or index entry exists but the file is missing. When `index.md` changes, refresh the top maintenance note and apply the Index Metadata And Statistics rules for footer date and count handling in the same edit.
-5. Check `AGENTS.md` and `CLAUDE.md` for stale or missing domain registrations, raw/wiki path registrations, workflow rules, safety rules, tag rules, and image/document processing rules that affect the current task. Keep them compatible when either one needs a structural update.
-6. If any files change, append `log.md` with the task action plus the maintenance results for `AGENTS.md`, `CLAUDE.md`, `index.md`, and frontmatter. State whether frontmatter was already valid, repaired at the top of the page, or blocked by an explicit no-write request. If `index.md` changed, state `wiki_file_count`, `indexed_page_count`, and footer count, and whether the indexed page count changed, stayed unchanged, or was corrected because of footer/statistics drift. If no maintenance change is needed but other files changed, log `已检查，无需更新` for each checked item.
+4. Check `index.md` for task-scoped page additions, removals, migrations, renames, missing entries, stale paths, stale summaries, tag changes, statistics drift, duplicate Markdown entries, and broken Markdown links. Before editing `index.md`, scan `wiki/**/*.md`, read current index entries, and compute `indexed_page_count`, `wiki_file_count`, `registered_domain_count`, `missing_count`, `broken_count`, and `duplicate_count`, plus the values currently recorded in the footer. Determine each task-scoped page state: already indexed, file exists but is not indexed, or index entry exists but the file is missing. When `index.md` changes, refresh the top maintenance note and apply the Index Metadata And Statistics rules in the same edit.
+5. Check `AGENTS.md` and `CLAUDE.md` for stale or missing domain registrations, raw/wiki path registrations, workflow rules, safety rules, tag rules, and image/document processing rules that affect the current task. Follow the vault's declared relationship: keep them byte-identical and hash-verified when the vault requires identical entrypoints; otherwise keep shared rules compatible without erasing intentional runtime differences.
+6. If any files change, append `log.md` with the task action plus the maintenance results for `AGENTS.md`, `CLAUDE.md`, `index.md`, and frontmatter. State whether frontmatter was already valid, repaired at the top of the page, or blocked by an explicit no-write request. If `index.md` changed, record all three authoritative variables, all three health counts, and whether the indexed page count changed, stayed unchanged, or was corrected because of statistics drift. If no maintenance change is needed but other files changed, log `已检查，无需更新` for each checked item.
 7. Maintenance may update structure and metadata without changing source-derived prose. Do not expand, rewrite, or reinterpret source material merely because the maintenance pass found metadata or index gaps.
 
 ## Safety Rules
@@ -46,6 +45,25 @@ Run this pass before finalizing any task:
 - For image-heavy work, build an image manifest first and use the batch workflow below. Ask only when image scope, ordering, or duplicate filenames cannot be resolved from the page and its sources.
 - Use short Obsidian image embeds such as `![[文件名.png]]`; do not convert them to full paths.
 
+## Large Append-Only Logs
+
+Treat `log.md` as an append-only journal that may be too large for a full-file read. The need for an EOF anchor never justifies loading or rewriting the whole file.
+
+Before appending:
+
+1. Inspect file metadata with `Get-Item -LiteralPath ".\log.md"` and inspect only the recent tail with `Get-Content -LiteralPath ".\log.md" -Encoding UTF8 -Tail 80`. If the entry format or a unique anchor is still unclear, expand the bounded read to at most `-Tail 200`; do not fall back to a whole-file read.
+2. Build the complete final entry in working context. Search the bounded tail for the exact task heading and do not append when that heading is already present.
+3. Record the original byte length and SHA-256 with `Get-FileHash`. Immediately before writing, read the bounded tail again. If its content, byte length, hash, or last-write time changed, discard the old anchor and derive a fresh one.
+4. Use the final unique 2-4 lines as the EOF context for `apply_patch`, and append the complete entry in one patch. Do not use `Set-Content`, whole-file replacement, `>>`, or `Add-Content` for `log.md`.
+5. If `apply_patch` rejects the operation because of file size or cannot match a unique current EOF anchor, stop and report the limitation. Never degrade to a whole-file rewrite.
+
+After appending:
+
+- Confirm that the byte length increased, the exact task heading occurs once in the bounded tail, the complete entry is visible within `Get-Content -Tail 80`, and the file still ends with a newline.
+- Hash exactly the original byte-length prefix using read-only streaming and require it to equal the pre-append whole-file SHA-256. This proves that all pre-existing bytes remained unchanged.
+- If the new entry is not the final entry, is incomplete, is duplicated, or the prefix hash differs, report the failure and do not claim append-only success.
+- Keep one final `log.md` entry per maintenance task; do not add separate entries for intermediate steps.
+
 ## Windows And Python
 
 Work in PowerShell with Unicode-safe paths.
@@ -53,7 +71,7 @@ Work in PowerShell with Unicode-safe paths.
 - Prefer `rg` for file discovery.
 - Do not rely on system `python`, `py`, or `python3`.
 - Prefer the current vault or project `.venv\Scripts\python.exe` when it exists.
-- For project scripts, prefer in order: `.venv\Scripts\python.exe`, `.runtime\python\python.exe`, `.codex-python\python.exe`.
+- For other project scripts, prefer in order: `.venv\Scripts\python.exe`, `.runtime\python\python.exe`, `.codex-python\python.exe`.
 - Use `pathlib.Path` in any Python script created for this workflow.
 - Pass Chinese paths as explicit PowerShell arguments; do not pipe Chinese paths or content into Python.
 - Do not modify Windows PATH, install Python, remove Python versions, or call user-directory Python unless the user explicitly asks.
@@ -111,7 +129,7 @@ For every wiki create, update, query, ingest, migrate, index, lint, audit, extra
 Every time this skill is used, you must inspect and decide whether `AGENTS.md`, `CLAUDE.md`, and `index.md` remain current. They do not need to change every time, but inspection is mandatory and structural gaps should be repaired automatically unless the user explicitly forbids file changes.
 
 - Check `AGENTS.md` for domain registry, raw/wiki path registration, processing rules, safety rules, tag rules, image/document rules, and workflow changes that may need Codex-facing schema updates.
-- Check `CLAUDE.md` for shared schema content that should stay compatible with `AGENTS.md`.
+- Check `CLAUDE.md` according to the vault contract. When the vault requires identical schema entrypoints, synchronize it with `AGENTS.md` and verify SHA-256 equality; otherwise preserve intentional runtime-specific differences while keeping shared schema rules compatible.
 - Check `index.md` for page additions, deletions, migrations, renames, path changes, summary changes, tag changes, and stale or missing entries.
 - For query or exploratory tasks, do not rewrite source-derived content just because it was read. Do repair clear maintenance gaps found in task-scoped pages or index/schema files unless the user explicitly says read-only, audit-only, query-only, or no file changes.
 - For any task that changes files, append `log.md` with the check result for all three files and frontmatter, even when the result is `已检查，无需更新`.
@@ -119,26 +137,36 @@ Every time this skill is used, you must inspect and decide whether `AGENTS.md`, 
 
 ## Index Metadata And Statistics
 
-Whenever `index.md` is created, rebuilt, refreshed, or otherwise modified, update both its header metadata and footer statistics in the same change.
+Whenever `index.md` is created, rebuilt, refreshed, or otherwise modified, update its header metadata, three-variable footer, and health line in the same change.
 
 - Update the top note in the form `由 LLM 维护。上次更新：YYYY-MM-DD（...）`.
 - The top note must include the current date, a concise action summary, and the affected files. When many files are involved, summarize as `A.md、B.md 等 N 个 wiki 页面`.
-- Update the footer in the form `_统计：N 个页面 | M 个领域 | 上次更新于 YYYY-MM-DD_`.
-- Before editing `index.md`, compute both counts:
-  - `indexed_page_count`: the number of unique wiki Markdown pages currently recorded in `index.md`. This is the authority for the footer page count.
-  - `wiki_file_count`: the number of actual Markdown files from scanning `wiki/**/*.md`. This is for coverage checks, missing-index discovery, broken-link checks, duplicate detection, and drift diagnosis.
-- Count only wiki Markdown pages for `indexed_page_count`. Do not count `.canvas` files, images, raw files, generated preprocessing artifacts, external links, schema files, or other non-Markdown resources as pages.
-- Use `wiki_file_count` to discover wiki files that are not yet indexed, but do not overwrite the footer page count with `wiki_file_count` merely because the file scan is larger than the index coverage.
-- If an existing wiki file is not in `index.md` and the task adds it for the first time, treat the change as `补录既有页面` / `first-time index backfill`, not as a newly created file. If the existing footer count matched the pre-change `indexed_page_count`, increment the footer page count by the number of newly indexed pages. If the existing footer count did not match the pre-change `indexed_page_count`, set the footer to the post-change `indexed_page_count` and record a `统计漂移修正` in `log.md`; do not blindly add to the stale footer number.
-- If a task-scoped page already exists in `index.md` and the change only refreshes its summary, tags, section placement, path text, or maintenance wording, do not change the footer page-count number unless the footer differs from `indexed_page_count`.
-- If a task creates a new wiki Markdown file and adds a new index entry for it, `wiki_file_count` and `indexed_page_count` should both increase; set the footer page count to the post-change `indexed_page_count` and record the count change in `log.md`.
-- If a task deletes, migrates, renames, archives, de-indexes, or restores index coverage for wiki pages, update the footer page count from the post-change `indexed_page_count` and record whether this was an indexed-page addition, removal, rename/migration, de-index, or drift correction.
-- If `wiki_file_count` is greater than `indexed_page_count`, report or repair task-scoped missing index entries according to the workflow. Do not automatically add every unindexed file unless the user asked for a full index rebuild, lint/audit repair, or broad index refresh.
-- If `indexed_page_count` differs from the existing footer count, treat it as footer/statistics drift. Correct the footer count to `indexed_page_count` in the same edit and record the drift correction in `log.md`.
-- Count domains from the vault schema or domain registry by default. If the operation adds, removes, or renames a registered domain, update the domain count and schema/index wording together.
-- `.canvas` links may remain in `index.md` as explicit resource links, but they must not be included in the Markdown page count.
-- After changing `index.md`, verify the post-change `indexed_page_count`, `wiki_file_count`, footer count, broken Markdown links, duplicate Markdown entries, and any task-scoped missing index entries. Explicitly recorded non-Markdown links are allowed.
-- The `log.md` entry for any operation that changes `index.md` must state that the top update note and footer date were refreshed, list `wiki_file_count`, `indexed_page_count`, and footer count, and explicitly say whether the indexed page count changed, stayed unchanged, or was corrected because of statistics drift.
+- Use this generic footer template, substituting values computed from the current vault:
+
+```markdown
+_统计：{indexed_page_count} 个已索引页面 | {wiki_file_count} 个 Wiki 文件 | {registered_domain_count} 个注册领域 | 上次更新于 YYYY-MM-DD_
+
+> 索引健康：未收录 {missing_count} | Markdown 断链 {broken_count} | 重复条目 {duplicate_count}；`.canvas`、示例占位和 `raw/...` 链接不计入页面数。
+```
+
+- Compute three authoritative variables before editing:
+  - `indexed_page_count`: the number of unique index entries that resolve to real `wiki/**/*.md` files.
+  - `wiki_file_count`: the number of actual Markdown files found by scanning `wiki/**/*.md`.
+  - `registered_domain_count`: the number of data rows in the vault's authoritative domain registry, excluding the table header and separator.
+- Compute three health variables from the same scan:
+  - `missing_count`: Wiki Markdown files not represented by a resolvable unique index entry.
+  - `broken_count`: non-exempt index links that do not resolve uniquely to a Wiki Markdown file.
+  - `duplicate_count`: repeated index entries targeting the same resolved Wiki Markdown file, counted using the vault's declared duplicate convention; when none is declared, count extra occurrences beyond the first.
+- Count only real Wiki Markdown pages. Exclude `.canvas`, images, raw files, generated artifacts, external links, schema files, example placeholders such as `[[页面标题]]`, and `raw/...` source links.
+- Use `wiki_file_count` for coverage checks; never substitute it for `indexed_page_count`. A fully covered vault may have equal values, but equality must be verified rather than assumed.
+- If an existing Wiki file is indexed for the first time, record it as `补录既有页面` / `first-time index backfill`. If the prior footer was stale, replace all footer and health values with the post-change computed values and record `统计漂移修正`; never increment a stale number blindly.
+- If an already indexed page only changes summary, tags, section placement, path text, or maintenance wording, `indexed_page_count` stays unchanged unless link resolution or deduplication changed.
+- For create, delete, migrate, rename, archive, de-index, or coverage-restoration operations, recompute all six variables and record the operation type and count changes in `log.md`.
+- If `wiki_file_count` is greater than `indexed_page_count`, report or repair task-scoped missing entries. Do not add every unindexed file unless the user asked for a full rebuild, lint/audit repair, or broad refresh.
+- Count domains from the vault schema or domain registry. When a registered domain changes, update schema and index wording together; never hardcode a particular vault's domain total in this skill.
+- `.canvas` links may remain as explicit resources but never count as Wiki Markdown pages.
+- After changing `index.md`, verify all six variables and confirm the rendered footer and health line each occur exactly once.
+- The `log.md` entry must state that the top note, footer date, three authoritative variables, and health line were refreshed, and whether the indexed page count changed, stayed unchanged, or was corrected because of statistics drift.
 
 ## Image-Heavy Source Analysis
 
@@ -163,14 +191,13 @@ Use this workflow for raw image directories, screenshot courses, PPT screenshot 
 
 ## Default Agent Batch Analysis
 
-When the user explicitly asks for default agents, subagents, or parallel agent work, use `multi_agent_v1.spawn_agent` with `agent_type: "default"` for read-only image analysis. The main Codex agent owns manifest creation, batching, final synthesis, and all file writes.
+When the user explicitly asks for default agents, subagents, or parallel agent work, use the currently available Codex collaboration dispatch interface with `agent_type: "default"` for read-only image analysis. In current Codex environments this is `collaboration.spawn_agent`; if the callable interface differs, use the exposed equivalent rather than an obsolete hard-coded namespace. The main Codex agent owns manifest creation, batching, final synthesis, and all file writes.
 
 Batching defaults:
 
-- 1-10 images: analyze locally unless delegation is useful.
-- 11-30 images: split into 2-3 default agents.
-- 31+ images: split into up to 6 default agents.
-- 100+ images: start with up to 6 parallel batches; if a batch remains too large, continue with later sub-batches after the first round returns.
+- 1-10 images: analyze locally.
+- 11-30 images: split into 2-3 batches.
+- 31+ images: split into no more than 6 total batches. If runtime concurrency is lower than the batch count, execute those same batches in waves; do not create additional batches beyond the six-batch total.
 
 Subagent rules:
 
@@ -261,7 +288,7 @@ Scan `wiki/` markdown files, read frontmatter and summary lines, read current `i
 
 When rebuilding or refreshing `index.md`, also check whether scanned paths reveal missing domain registrations or stale rules in `AGENTS.md` or `CLAUDE.md`.
 
-Before finishing an index refresh, run the Mandatory Maintenance Pass for the requested index scope. Verify `wiki_file_count`, `indexed_page_count`, footer count, broken Markdown links, duplicate Markdown entries, missing index entries in scope, and any explicit non-Markdown links such as `.canvas`. Append a `log.md` entry if `index.md` changes, and state that the top update note and footer date were refreshed plus whether the indexed page count changed, stayed unchanged, or was corrected because of statistics drift.
+Before finishing an index refresh, run the Mandatory Maintenance Pass for the requested index scope. Verify all three authoritative variables, all three health variables, the single footer and health-line occurrences, and any explicit non-Markdown links such as `.canvas`. Append a `log.md` entry if `index.md` changes, and state that the top note, footer date, statistics, and health line were refreshed plus whether the indexed page count changed, stayed unchanged, or was corrected because of statistics drift.
 
 ### Migrate
 
@@ -283,14 +310,19 @@ Use only when the user explicitly asks to delete, remove, archive, or de-index w
 
 ## Page Requirements
 
-Every wiki page should contain:
+Use the following as the default recommended page shape, subject to the vault schema, source type, existing page structure, and the user's explicit scope. Do not expand query-only or lightweight maintenance tasks merely to force every optional section into a page.
+
+Required structural metadata:
 
 1. YAML frontmatter as the first line/block of the file, starting with `---`, with `title`, `created`, `updated`, `domain`, `tags`, `sources`, and `status`.
 2. Inline tags matching frontmatter tags when inline tags are used.
 3. Tags normalized so spaces inside tag segments become `_`, such as `domain/AI_Live`.
-4. A one-sentence summary in blockquote form.
-5. Main content.
-6. `## 相关` with meaningful wiki links.
-7. `## 来源` pointing to raw directories or files, except schema-defined no-raw domains such as extracted thinking pages.
+
+Recommended content when appropriate and in scope:
+
+1. A one-sentence summary in blockquote form.
+2. Main content.
+3. `## 相关` with meaningful, resolvable Wiki links.
+4. `## 来源` pointing to raw directories or files, except schema-defined no-raw domains such as extracted thinking pages.
 
 Use the current date from the environment for `created`, `updated`, and log entries.

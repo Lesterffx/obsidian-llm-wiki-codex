@@ -53,7 +53,7 @@ Codex 版在这个思路上做了进一步适配：它可以结合项目内 Pyth
 - **Schema 双入口契约**：读取现有 `AGENTS.md` 与 `CLAUDE.md`；若 vault 声明两者完全相同，则保持字节一致并校验 SHA-256，否则保留有意的运行时差异。
 - **强制维护通道**：每次执行都会主动检查 `AGENTS.md`、`CLAUDE.md`、`index.md` 和任务相关 wiki 页 frontmatter；结构缺口默认修复，显式只读时只报告。
 - **frontmatter 顶部结构例外**：YAML frontmatter 必须在页面第一行；即使用户要求“补充放最后”或“保留正文顺序”，也会把 frontmatter 作为结构元数据放回顶部。
-- **六变量索引健康检查**：更新 `index.md` 前计算 `indexed_page_count`、`wiki_file_count`、`registered_domain_count`，以及 `missing_count`、`broken_count`、`duplicate_count`，统一刷新 footer 与索引健康行。
+- **六变量索引健康检查**：更新 `index.md` 前计算 `indexed_page_count`、`wiki_file_count`、`registered_domain_count`，以及 `missing_count`、`broken_count`、`duplicate_count`，并优先使用随 Skill 提供的固定精校脚本统一核对 footer 与索引健康行。
 - **frontmatter 与标签规范化**：新增、修改、优化 wiki 页面时检查 YAML frontmatter；tag 中空白会规范为 `_`。
 - **schema/index freshness check**：每次执行 Skill 都必须检查 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否需要更新。
 - **文档预处理运行时**：优先使用项目 `.venv` 处理 PDF、DOCX、PPTX、XLSX 的文本、页序、slide 顺序、图片 manifest。
@@ -81,6 +81,7 @@ obsidian-llm-wiki-codex/
 │   ├── log.example.md
 │   └── prompt-handbook.example.md
 ├── references/
+│   ├── index_stat.py
 │   └── schema.md
 ├── README.md
 ├── PRIVACY.md
@@ -88,7 +89,7 @@ obsidian-llm-wiki-codex/
 └── .gitignore
 ```
 
-`examples/` 提供可复制到 Obsidian vault 根目录的初始化范例，以及脱敏的实战指令手册；`references/schema.md` 是更完整的通用 schema 参考。
+`examples/` 提供可复制到 Obsidian vault 根目录的初始化范例，以及脱敏的实战指令手册；`references/schema.md` 是更完整的通用 schema 参考，`references/index_stat.py` 用于只读精校 `index.md` 六变量。
 
 ## 安装方式
 
@@ -207,6 +208,15 @@ $obsidian-llm-wiki 刷新 index.md，检查是否有新增、删除、迁移或�
 ```
 
 刷新索引时会先扫描 `wiki/**/*.md`，同时读取 `index.md` 现有条目，分别计算三项权威变量：`indexed_page_count`、`wiki_file_count`、`registered_domain_count`；再计算三项健康变量：`missing_count`、`broken_count`、`duplicate_count`。`.canvas`、示例占位和 `raw/...` 来源链接不计入 Wiki Markdown 页面数。
+
+Skill 自带固定的六变量精校脚本，使用项目允许的 Python 运行时执行；普通模式适合人工核对，`--json` 适合机器读取：
+
+```powershell
+& ".\.venv\Scripts\python.exe" "<skill_base>\references\index_stat.py" "<vault_root>"
+& ".\.venv\Scripts\python.exe" "<skill_base>\references\index_stat.py" "<vault_root>" --json
+```
+
+脚本只读扫描 vault，不硬编码任何知识库路径、领域或统计数字；Codex 环境优先从 `AGENTS.md` 读取领域注册表，并在存在 `CLAUDE.md` 时对照两份 schema。
 
 footer 同时展示已索引页面数、实际 Wiki 文件数和注册领域数，下一行展示未收录、Markdown 断链和重复条目。若已有 `wiki/示例页面.md` 第一次补录进 `index.md`，按 `补录既有页面 / first-time index backfill` 处理；旧 footer 失真时重新计算全部六项变量并记录 `统计漂移修正`，不得在旧数字上盲目递增。
 

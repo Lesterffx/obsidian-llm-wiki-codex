@@ -32,12 +32,15 @@ PRIVACY.md
 agents/openai.yaml
 assets/*.md
 examples/*.example.md
+references/index_stat.py
 references/schema.md
 ```
 
 搜索敏感词和私有路径时，重点检查密钥、账号凭证、本机绝对路径、网盘目录、真实 raw/wiki 领域名和客户/课程名称。
 
 如果命中内容来自个人 vault、原始资料、本机路径或密钥，请先移除再发布。文档中的泛化安全提醒可以保留，真实凭证和真实路径不能保留。
+
+公开工具脚本必须保持通用：不得内嵌真实 vault 路径、用户名、领域名称、统计数字、客户或课程信息，也不得包含任何账号凭证。
 
 ## 推荐做法
 

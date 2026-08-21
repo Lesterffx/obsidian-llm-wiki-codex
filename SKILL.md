@@ -165,6 +165,14 @@ _统计：{indexed_page_count} 个已索引页面 | {wiki_file_count} 个 Wiki �
 - If `wiki_file_count` is greater than `indexed_page_count`, report or repair task-scoped missing entries. Do not add every unindexed file unless the user asked for a full rebuild, lint/audit repair, or broad refresh.
 - Count domains from the vault schema or domain registry. When a registered domain changes, update schema and index wording together; never hardcode a particular vault's domain total in this skill.
 - `.canvas` links may remain as explicit resources but never count as Wiki Markdown pages.
+- When writing or validating `index.md`, prefer the fixed [six-variable validator](references/index_stat.py) instead of creating an ad hoc counting script. Run it with the first available project interpreter from the `Windows And Python` priority order:
+
+```powershell
+& ".\.venv\Scripts\python.exe" "<skill_base>\references\index_stat.py" "<vault_root>"
+& ".\.venv\Scripts\python.exe" "<skill_base>\references\index_stat.py" "<vault_root>" --json
+```
+
+  The normal output is human-readable; `--json` provides the six variables, issue details, schema comparison notes, and footer drift for machine use. The validator reads index table data rows, prefers `AGENTS.md` for the domain registry, compares `CLAUDE.md` when present, and never hardcodes vault-specific totals. If the fixed reference cannot be read or executed with any permitted project runtime, apply the same counting rules manually and report the limitation.
 - After changing `index.md`, verify all six variables and confirm the rendered footer and health line each occur exactly once.
 - The `log.md` entry must state that the top note, footer date, three authoritative variables, and health line were refreshed, and whether the indexed page count changed, stayed unchanged, or was corrected because of statistics drift.
 

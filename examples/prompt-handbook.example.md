@@ -221,6 +221,31 @@ $obsidian-llm-wiki 归档 @wiki/项目资料/示例项目复盘.md，保留文�
 $obsidian-llm-wiki 删除 @wiki/项目资料/示例项目复盘.md。只处理这一份明确的 wiki 文件，不删除 raw/；删除前报告影响范围。
 ```
 
+### 3.11 Log 状态、查询与分卷
+
+只读查看活动日志大小、日期范围和轮转状态：
+
+```text
+$obsidian-llm-wiki log status
+```
+
+查询活动日志和历史分卷：
+
+```text
+$obsidian-llm-wiki log query "YYYY-MM-DD optimize"
+```
+
+显式轮转：
+
+```text
+$obsidian-llm-wiki log rotate now
+$obsidian-llm-wiki log rotate year
+$obsidian-llm-wiki log rotate size
+$obsidian-llm-wiki log rotate auto
+```
+
+写入型任务会在最终追加日志前自动运行低Token预检；query、只读audit、`log status`和`log query`不会自动轮转。默认在投影大小达到2 MiB或活动日志跨年时整卷归档。分卷只是整理，不是独立备份。
+
 ## 四、命令决策树
 
 ```text
@@ -244,6 +269,8 @@ $obsidian-llm-wiki 删除 @wiki/项目资料/示例项目复盘.md。只处理�
 ├─ 提炼跨页面方法论 → 创建或优化提炼思维
 ├─ 搬迁旧笔记 → migrate，先清单后执行
 ├─ 清理页面 → 优先 de-index 或 archived
+├─ 检查或追溯日志 → log status / log query
+├─ 手动整理活动日志 → log rotate now / year / size / auto
 └─ 维护知识库 → query / lint / audit / index
 ```
 
@@ -255,6 +282,7 @@ $obsidian-llm-wiki 删除 @wiki/项目资料/示例项目复盘.md。只处理�
 - **图片先建 manifest**：图片密集资料先明确顺序和覆盖范围。
 - **文档先预处理**：PDF/DOCX/PPTX/XLSX 先做确定性解析，再决定是否读图。
 - **主 Codex 统一收口**：default agents 只做只读分析，主 Codex 负责覆盖率、整合和写入。
+- **日志预检无需重复描述**：写入型任务会自动调用固定脚本；只有显式查询或轮转时才使用 `log` 命令。
 - **特殊要求才写出来**：例如只处理前 30 张图、不要调用 default agents、只报告差异。
 
 ## 六、常见避坑
@@ -263,6 +291,7 @@ $obsidian-llm-wiki 删除 @wiki/项目资料/示例项目复盘.md。只处理�
 - 不要只写“读取全部图片”，应同时说明顺序、缺失、重名和低置信度处理要求。
 - 不要要求中间产物默认写入 `raw/`；`raw/` 是不可变来源层。
 - 不要在每条提示词中重复 frontmatter、索引和日志规则；这些属于 Skill 默认职责。
+- 不要把分卷当作备份，也不要要求 Skill 自动删除、压缩或合并历史卷。
 - 不要直接物理删除 wiki 页面；大多数清理任务更适合归档或移出索引。
 
 ## 相关资源

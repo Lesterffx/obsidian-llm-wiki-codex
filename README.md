@@ -59,7 +59,8 @@ Codex 版在这个思路上做了进一步适配：它可以结合项目内 Pyth
 - **文档预处理运行时**：优先使用项目 `.venv` 处理 PDF、DOCX、PPTX、XLSX 的文本、页序、slide 顺序、图片 manifest。
 - **图片密集资料分析**：先建立 image manifest，再处理截图课程、PPT 截图、raw 图片目录和 wiki 图片引用。
 - **最多 6 个总批次读图**：大量图片拆成不超过 6 个连续批次；并发槽不足时分波执行，只读分析后由主 Codex 汇总。
-- **大体积日志安全追加**：`log.md` 默认只读取末尾 80 行，必要时最多 200 行；通过唯一 EOF 锚点、`apply_patch`、去重和旧内容前缀哈希证明 append-only。
+- **低 Token 日志预检**：写入型任务在最终追加日志前调用固定只读 PowerShell 脚本，只返回是否需要轮转的紧凑 JSON，不重复生成检查代码或加载日志正文。
+- **大体积日志安全追加与分卷**：`log.md` 使用有限尾部和唯一 EOF 锚点追加；默认在投影大小达到 2 MiB 或跨年时整卷归档，并支持状态、历史查询和显式轮转命令。
 - **migrate / delete / remove / de-index 工作流**：支持旧笔记迁移、页面归档、移出索引和谨慎删除。
 - **Windows / PowerShell 安全规则**：避免依赖系统 Python，避免批量删除和递归删除。
 
@@ -74,7 +75,8 @@ obsidian-llm-wiki-codex/
 │   ├── wiki-page.md
 │   ├── book-note.md
 │   ├── meeting-note.md
-│   └── tool-page.md
+│   ├── tool-page.md
+│   └── log-active.md
 ├── examples/
 │   ├── AGENTS.example.md
 │   ├── index.example.md
@@ -82,14 +84,17 @@ obsidian-llm-wiki-codex/
 │   └── prompt-handbook.example.md
 ├── references/
 │   ├── index_stat.py
+│   ├── log-rotation.md
 │   └── schema.md
+├── scripts/
+│   └── log-preflight.ps1
 ├── README.md
 ├── PRIVACY.md
 ├── LICENSE
 └── .gitignore
 ```
 
-`examples/` 提供可复制到 Obsidian vault 根目录的初始化范例，以及脱敏的实战指令手册；`references/schema.md` 是更完整的通用 schema 参考，`references/index_stat.py` 用于只读精校 `index.md` 六变量。
+`examples/` 提供可复制到 Obsidian vault 根目录的初始化范例和脱敏实战指令手册；`references/schema.md` 是更完整的通用 schema 参考，`references/index_stat.py` 用于只读精校 `index.md` 六变量，`references/log-rotation.md` 描述日志分卷与恢复规则。
 
 ## 安装方式
 
@@ -106,7 +111,8 @@ obsidian-llm-wiki-codex/
 ├── SKILL.md
 ├── agents/
 ├── assets/
-└── references/
+├── references/
+└── scripts/
 ```
 
 安装后重启 Codex，或新开一个 Codex 线程，让 Skill 元数据重新加载。
@@ -153,6 +159,7 @@ examples/log.example.md     →  log.md
 - wiki 链接规则
 - 图片管理规则
 - 变更联动规则
+- 日志预检、追加和分卷规则
 - ingest/query/lint/migrate/index 工作流
 
 ### 3. 放入原始资料
@@ -226,6 +233,35 @@ _统计：{indexed_page_count} 个已索引页面 | {wiki_file_count} 个 Wiki �
 > 索引健康：未收录 {missing_count} | Markdown 断链 {broken_count} | 重复条目 {duplicate_count}；`.canvas`、示例占位和 `raw/...` 链接不计入页面数。
 ```
 
+### 日志状态、查询与分卷
+
+查看活动日志状态，不修改文件：
+
+```text
+$obsidian-llm-wiki log status
+```
+
+按日期、操作或关键词查询活动日志和历史分卷：
+
+```text
+$obsidian-llm-wiki log query "YYYY-MM-DD optimize"
+```
+
+显式轮转模式：
+
+```text
+$obsidian-llm-wiki log rotate now
+$obsidian-llm-wiki log rotate year
+$obsidian-llm-wiki log rotate size
+$obsidian-llm-wiki log rotate auto
+```
+
+`ingest`、`optimize`、`migrate`、`index`、删除/归档/重命名和修复型 lint/audit 等写入任务，在追加最终日志前运行固定的 `scripts/log-preflight.ps1`。预检按“当前 `log.md` 字节数 + 实际待追加文本的 UTF-8 字节数”计算投影大小；默认达到 2 MiB 或活动卷跨年时才进入完整轮转。query、只读 audit、`log status`、`log query` 和没有文件变化的任务不会自动轮转。
+
+轮转采用整文件移动，不拆分或重写历史内容。活动日志保留在 `log.md`，历史卷存放在 `logs/archive/`，分卷清单为 `logs/log-archives.md`。新活动日志从 `assets/log-active.md` 创建，不复制旧条目；`logs/` 位于 `wiki/` 之外，不计入索引统计。
+
+> 分卷只是整理日志，不等同于独立备份。历史卷不得自动删除、压缩、合并或继续追加；真正的备份应存放在单独管理的位置。
+
 ### PDF / DOCX / PPTX
 
 ```text
@@ -269,6 +305,7 @@ $obsidian-llm-wiki 将 @wiki/路径/页面.md 从 index.md 中移出，但不要
 - `raw/` 原始资料、截图、课程文件、扫描件。
 - `wiki/` 中包含个人、客户、课程或商业隐私的页面。
 - 项目级 `AGENTS.md`、`CLAUDE.md`、`index.md`、`log.md`。
+- 私人 vault 生成的 `logs/`、`logs/archive/` 和 `logs/log-archives.md`。
 - `.venv/`、缓存、临时文件。
 - API key、token、cookie、密钥、账号信息。
 - 本机绝对路径和个人目录结构。

@@ -1,6 +1,6 @@
 ---
 name: obsidian-llm-wiki
-description: Maintain Obsidian LLM Wiki knowledge bases in Codex. Use when working with Obsidian vaults that have raw/ and wiki/ layers, AGENTS.md or CLAUDE.md schema files, index.md, and log.md; when the user asks to ingest source material, preprocess PDF/DOCX/PPTX files with a project Python venv, analyze raw images or screenshot courses, process PPT screenshots, read wiki image embeds, batch-analyze many images with default subagents, query the wiki, lint or audit wiki health, migrate notes, delete or remove wiki pages, rebuild the index, check AGENTS.md/CLAUDE.md/index.md freshness, normalize YAML frontmatter and tags, optimize existing wiki pages, append summaries, extract thinking frameworks, or organize Chinese knowledge-base pages.
+description: Maintain Obsidian LLM Wiki knowledge bases in Codex. Use when working with Obsidian vaults that have raw/ and wiki/ layers, AGENTS.md or CLAUDE.md schema files, index.md, and log.md; when the user asks to ingest source material, preprocess PDF/DOCX/PPTX files with a project Python venv, analyze raw images or screenshot courses, process PPT screenshots, read wiki image embeds, batch-analyze many images with default subagents, query the wiki or its operation logs, inspect or rotate large append-only logs, lint or audit wiki health, migrate notes, delete or remove wiki pages, rebuild the index, check AGENTS.md/CLAUDE.md/index.md freshness, normalize YAML frontmatter and tags, optimize existing wiki pages, append summaries, extract thinking frameworks, or organize Chinese knowledge-base pages.
 ---
 
 # Obsidian LLM Wiki
@@ -49,10 +49,17 @@ Run this pass before finalizing any task:
 
 Treat `log.md` as an append-only journal that may be too large for a full-file read. The need for an EOF anchor never justifies loading or rewriting the whole file.
 
+Before the final log append for any write task, build the exact complete append text, including separators and the final newline, and run `scripts/log-preflight.ps1` with `-ThresholdMiB 2 -Json`. This applies to ingest, optimize, migrate, index, delete/archive/rename, repair-mode lint/audit, and any other workflow that changed files. It does not apply to query-only or read-only tasks, `log status`, `log query`, or tasks with no file changes.
+
+- When `rotation_due=false`, continue with the bounded append workflow below.
+- When `rotation_due=true`, read [references/log-rotation.md](references/log-rotation.md) and follow the requested or automatic rotation mode.
+- Explicit log modes are `log status`, `log query "<condition>"`, `log rotate now`, `log rotate year`, `log rotate size`, and `log rotate auto`.
+- The preflight script is read-only. Do not replace it with newly generated Python or PowerShell code, and do not create state/cache files for routine checks.
+
 Before appending:
 
-1. Inspect file metadata with `Get-Item -LiteralPath ".\log.md"` and inspect only the recent tail with `Get-Content -LiteralPath ".\log.md" -Encoding UTF8 -Tail 80`. If the entry format or a unique anchor is still unclear, expand the bounded read to at most `-Tail 200`; do not fall back to a whole-file read.
-2. Build the complete final entry in working context. Search the bounded tail for the exact task heading and do not append when that heading is already present.
+1. Inspect file metadata and process `Get-Content -LiteralPath ".\log.md" -Encoding UTF8 -Tail 80` inside PowerShell. Return only the duplicate-heading result and the final unique 2-4 lines needed as an EOF anchor. If the anchor is still unclear, expand the internal bounded read to at most `-Tail 200`; never return the entire tail or fall back to a whole-file read.
+2. Search the bounded tail for the exact task heading and do not append when that heading is already present.
 3. Record the original byte length and SHA-256 with `Get-FileHash`. Immediately before writing, read the bounded tail again. If its content, byte length, hash, or last-write time changed, discard the old anchor and derive a fresh one.
 4. Use the final unique 2-4 lines as the EOF context for `apply_patch`, and append the complete entry in one patch. Do not use `Set-Content`, whole-file replacement, `>>`, or `Add-Content` for `log.md`.
 5. If `apply_patch` rejects the operation because of file size or cannot match a unique current EOF anchor, stop and report the limitation. Never degrade to a whole-file rewrite.
@@ -63,6 +70,7 @@ After appending:
 - Hash exactly the original byte-length prefix using read-only streaming and require it to equal the pre-append whole-file SHA-256. This proves that all pre-existing bytes remained unchanged.
 - If the new entry is not the final entry, is incomplete, is duplicated, or the prefix hash differs, report the failure and do not claim append-only success.
 - Keep one final `log.md` entry per maintenance task; do not add separate entries for intermediate steps.
+- New entries use the compact standard entry in [references/log-rotation.md](references/log-rotation.md). Keep `范围`, `变更`, `维护`, and `验证`; add `资料` and `未决` only when applicable. Never rewrite historical entries to normalize their format.
 
 ## Windows And Python
 
@@ -106,6 +114,7 @@ Use project-local `templates/` first if present. Otherwise use this skill's temp
 - `assets/book-note.md` for book notes.
 - `assets/meeting-note.md` for meetings.
 - `assets/tool-page.md` for tool pages.
+- `assets/log-active.md` only when creating a new active `log.md` after a successful rotation.
 
 For new vault initialization, use `examples/AGENTS.example.md`, `examples/index.example.md`, and `examples/log.example.md` when available; use `references/schema.md` as the fuller schema reference.
 
@@ -255,6 +264,17 @@ Use when the user asks a question about the knowledge base.
 3. Synthesize the answer in Chinese and cite pages with `[[页面标题]]`.
 4. Run the Mandatory Maintenance Pass for the pages and index/schema files touched by the query. If the user explicitly requested read-only or no file changes, report any maintenance gaps instead of writing them.
 5. If the answer is worth preserving, suggest archiving it as a wiki page, but do not create one without user confirmation.
+
+### Log
+
+Use when the user asks for `log status`, `log query`, or `log rotate`, or when a write workflow is about to append its one final maintenance entry.
+
+1. For a write workflow, build the exact final append text and run `scripts/log-preflight.ps1 -ThresholdMiB 2 -Json`. Do not generate replacement preflight code.
+2. When preflight reports no rotation due, use the low-token bounded append workflow in Large Append-Only Logs.
+3. For `log status`, run the script with `-Detailed -Json` and do not mutate files.
+4. For `log query`, search the active log and any `logs/archive/*.md` volumes with `rg`; read only bounded context around matches.
+5. For `log rotate now`, `log rotate year`, `log rotate size`, `log rotate auto`, or automatic preflight results that require rotation, read and follow [references/log-rotation.md](references/log-rotation.md).
+6. Never treat rotation as backup, never rewrite archived volumes, and never include `logs/` in Wiki page counts.
 
 ### Optimize Existing Wiki Pages
 

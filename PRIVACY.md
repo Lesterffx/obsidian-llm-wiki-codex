@@ -7,6 +7,7 @@
 - `raw/`：PDF、DOCX、PPTX、图片、截图、扫描件、课程资料、会议资料。
 - `wiki/`：个人知识库页面、客户资料、课程笔记、商业分析、私人总结。
 - 项目级配置：私有 vault 的 `AGENTS.md`、`CLAUDE.md`、`index.md`、`log.md`。
+- 日志分卷：私有 vault 生成的 `logs/`、`logs/log-archives.md` 和 `logs/archive/*.md`。
 - Python 环境：`.venv/`、`.runtime/`、`.codex-python/`。
 - Codex 或 Claude 本地目录：`.codex/`、`.claude/`。
 - 密钥和账号：API key、token、cookie、密码、SSH key、OAuth 凭证。
@@ -33,14 +34,16 @@ agents/openai.yaml
 assets/*.md
 examples/*.example.md
 references/index_stat.py
+references/log-rotation.md
 references/schema.md
+scripts/log-preflight.ps1
 ```
 
 搜索敏感词和私有路径时，重点检查密钥、账号凭证、本机绝对路径、网盘目录、真实 raw/wiki 领域名和客户/课程名称。
 
 如果命中内容来自个人 vault、原始资料、本机路径或密钥，请先移除再发布。文档中的泛化安全提醒可以保留，真实凭证和真实路径不能保留。
 
-公开工具脚本必须保持通用：不得内嵌真实 vault 路径、用户名、领域名称、统计数字、客户或课程信息，也不得包含任何账号凭证。
+公开工具脚本必须保持通用：不得内嵌真实 vault 路径、用户名、领域名称、统计数字、客户或课程信息，也不得包含任何账号凭证。日志示例和分卷说明只能使用日期、路径和计数占位符，不得复制真实 `log.md` 条目或归档目录。
 
 ## 推荐做法
 

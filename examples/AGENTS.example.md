@@ -148,23 +148,25 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 ### log.md 格式
 
 ```markdown
-## [YYYY-MM-DD] <操作类型> | <标题>
+## [YYYY-MM-DD] <action> | <title>
 
-- 页面：`wiki/<路径>.md`
-- 操作：<操作描述>
-- 变更：
-  - 具体变更 1
-  - 具体变更 2
-- `AGENTS.md`：已检查 / 已更新 / 无需更新，xxx
-- `CLAUDE.md`：已检查 / 已更新 / 无需更新，xxx
-- `index.md`：已检查 / 已更新 / 无需更新，xxx
-- frontmatter：已检查 / 已补到顶部 / 已修复字段 / 只读未写入，xxx
-- index 统计：`indexed_page_count` = N；`wiki_file_count` = N；`registered_domain_count` = N；`missing_count` = N；`broken_count` = N；`duplicate_count` = N；已变化 / 未变化 / 已修正统计漂移，xxx
+- 范围：本次任务及边界。
+- 变更：涉及的文件和操作。
+- 资料：来源、图片或附件核对结果。
+- 维护：frontmatter=<valid/repaired/n-a>；index=<unchanged/refreshed>；schema=<unchanged/updated, hash-equal>；raw=unchanged。
+- 验证：实际执行的检查及结果。
+- 未决：存在异常时填写。
 ```
 
-`log.md` 过大时只读取末尾 80 行，必要时最多 200 行。追加前检查重复标题、文件长度、SHA-256、末尾内容和更新时间；使用唯一 EOF 锚点通过 `apply_patch` 一次追加。追加后验证旧内容前缀哈希不变。禁止用 `Set-Content`、整文件替换、`>>` 或 `Add-Content` 改写日志。
+`范围`、`变更`、`维护`、`验证`为必需字段；`资料`和`未决`按需填写。`index.md` 变化时在`维护`中记录三项权威变量和三项健康变量。不得改写历史条目以适配新格式。
 
-操作类型：`ingest` | `optimize` | `lint` | `audit` | `query` | `migrate`
+写入型任务在最终追加前调用 Skill 的 `scripts/log-preflight.ps1`，按当前日志字节数加实际待追加UTF-8字节数计算投影大小；默认达到2 MiB或活动日志跨年时轮转。query、只读 lint/audit、`log status`、`log query`和没有文件变化的任务不自动轮转。
+
+支持 `log status`、`log query`、`log rotate now`、`log rotate year`、`log rotate size`、`log rotate auto`。普通追加只在 PowerShell 内部读取末尾80行，必要时最多200行，只返回重复标题判断和唯一EOF锚点；使用 `apply_patch` 一次追加，并验证旧内容前缀哈希不变。
+
+轮转时把完整旧 `log.md` 原样移动到 `logs/archive/log-YYYY-MM-DD-to-YYYY-MM-DD.md`，用 `assets/log-active.md` 创建新日志，并在 `logs/log-archives.md` 记录分卷。不得复制后清空、拆分、改写、覆盖或继续追加历史卷；`logs/` 不计入Wiki页面统计，分卷不等于独立备份。
+
+操作类型：`ingest` | `optimize` | `lint` | `audit` | `query` | `migrate` | `index` | `rotate`
 
 ## 工作流
 

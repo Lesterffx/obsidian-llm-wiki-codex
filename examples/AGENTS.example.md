@@ -115,6 +115,21 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 - `.venv` 负责可重复的解析、排序、抽取和 manifest；`default` agents 负责 OCR-like 图片阅读、截图理解、图表理解和洞见提炼。
 - 不默认假设 Tesseract、OpenCV、PaddleOCR、RapidOCR 等传统 OCR 引擎可用。
 
+PDF 使用 Skill 固定脚本，不为每个任务生成临时解析脚本：
+
+```powershell
+& ".\.venv\Scripts\python.exe" "<skill_base>\scripts\preprocess_pdf.py" `
+  --input "<PDF绝对路径>" `
+  --vault-root "<vault绝对路径>" `
+  --task-id "<时间戳-安全任务标识>"
+```
+
+- 依赖固定在 `requirements-llm-wiki.txt`，不得自动安装；缺少依赖时报告并由用户决定是否安装到项目 `.venv`。
+- PDF 文本、图片、渲染页和 manifest 只能写入 `tmp/obsidian-llm-wiki/<task-id>/`，不得写入 `raw/`。
+- PDF 读取和临时文件清理是两个独立工作流；页面、索引和验证完成后再进入清理。
+- 清理权限来自本次 `created_files.json`。文件逐个删除；空目录按 `created_directories` 最深优先逐个删除；`tmp/obsidian-llm-wiki/` 仅在完全为空时删除，始终保留 `tmp/`。
+- 禁止递归、通配符、管道、循环、数组和批量删除；执行策略阻断空目录删除时保留空目录并报告，不得改用等价命令绕过。
+
 ## 页面结构
 
 必需结构：YAML frontmatter 位于文件第一行；存在 inline tags 时与 frontmatter 一致；标签片段中的空格规范为 `_`。
@@ -210,3 +225,4 @@ Frontmatter 的 `tags` 字段是权威来源。如果存在 inline tags，应与
 - 保持中文为主要内容语言。
 - 不破坏已有 wiki 链接。
 - 优化页面时不删除已有图片嵌入。
+- 普通目录禁止删除；唯一例外是本次 `tmp/obsidian-llm-wiki/<task-id>/` 中已登记且确认为空的目录，以及完全为空的 `tmp/obsidian-llm-wiki/` 工作容器。每次只能删除一个明确目录，且不得使用 `-Recurse`。

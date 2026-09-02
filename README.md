@@ -57,6 +57,8 @@ Codex 版在这个思路上做了进一步适配：它可以结合项目内 Pyth
 - **frontmatter 与标签规范化**：新增、修改、优化 wiki 页面时检查 YAML frontmatter；tag 中空白会规范为 `_`。
 - **schema/index freshness check**：每次执行 Skill 都必须检查 `AGENTS.md`、`CLAUDE.md`、`index.md` 是否需要更新。
 - **文档预处理运行时**：优先使用项目 `.venv` 处理 PDF、DOCX、PPTX、XLSX 的文本、页序、slide 顺序、图片 manifest。
+- **中文 PDF 固定预处理**：使用随 Skill 提供的脚本提取逐页文本、页码、元数据和嵌入图片，检测替换字符与控制字符；空白页或疑似乱码页自动渲染供视觉核对。
+- **任务临时目录闭环**：所有 PDF 中间产物进入独立 `tmp/obsidian-llm-wiki/<task-id>/`，按登记清单逐文件清理，再按最深优先删除空目录；不跨任务、不递归、不批量删除。
 - **图片密集资料分析**：先建立 image manifest，再处理截图课程、PPT 截图、raw 图片目录和 wiki 图片引用。
 - **最多 6 个总批次读图**：大量图片拆成不超过 6 个连续批次；并发槽不足时分波执行，只读分析后由主 Codex 汇总。
 - **低 Token 日志预检**：写入型任务在最终追加日志前调用固定只读 PowerShell 脚本，只返回是否需要轮转的紧凑 JSON，不重复生成检查代码或加载日志正文。
@@ -85,9 +87,13 @@ obsidian-llm-wiki-codex/
 ├── references/
 │   ├── index_stat.py
 │   ├── log-rotation.md
-│   └── schema.md
+│   ├── pdf-preprocessing.md
+│   ├── schema.md
+│   └── temp-cleanup.md
 ├── scripts/
-│   └── log-preflight.ps1
+│   ├── log-preflight.ps1
+│   └── preprocess_pdf.py
+├── requirements-llm-wiki.txt
 ├── README.md
 ├── PRIVACY.md
 ├── LICENSE
@@ -109,6 +115,7 @@ obsidian-llm-wiki-codex/
 ```text
 %USERPROFILE%\.codex\skills\obsidian-llm-wiki\
 ├── SKILL.md
+├── requirements-llm-wiki.txt
 ├── agents/
 ├── assets/
 ├── references/
@@ -116,6 +123,12 @@ obsidian-llm-wiki-codex/
 ```
 
 安装后重启 Codex，或新开一个 Codex 线程，让 Skill 元数据重新加载。
+
+PDF 预处理额外依赖 `pypdf` 与 `PyMuPDF`。Skill 不会自动安装依赖；确认要启用 PDF 功能后，可由你明确执行以下命令，把固定版本安装到 vault 或项目自己的 `.venv`：
+
+```powershell
+& "<vault-root>\.venv\Scripts\python.exe" -m pip install -r "<skill_base>\requirements-llm-wiki.txt"
+```
 
 ## 快速开始
 
@@ -265,8 +278,29 @@ $obsidian-llm-wiki log rotate auto
 ### PDF / DOCX / PPTX
 
 ```text
-$obsidian-llm-wiki ingest @raw/路径/文件.pptx，先做文档预处理，确认 slide 顺序、文本和图片 manifest，再整理成 wiki 页面。
+$obsidian-llm-wiki ingest @raw/<领域>/示例资料.pdf，先做 PDF 预处理，提取中文文本、页码、元数据和图片 manifest；疑似乱码或空白页面再做视觉读取，完成 wiki 后清理本次任务临时目录。
 ```
+
+PDF 使用固定入口，不为每个任务临时生成解析脚本：
+
+```powershell
+& ".\.venv\Scripts\python.exe" "<skill_base>\scripts\preprocess_pdf.py" `
+  --input "<vault-root>\raw\<领域>\示例资料.pdf" `
+  --vault-root "<vault-root>" `
+  --task-id "YYYYMMDD-example-ingest"
+```
+
+输出固定写入 `<vault-root>/tmp/obsidian-llm-wiki/<task-id>/`，包括：
+
+- `metadata.json`：源文件哈希、PDF 元数据和页数；
+- `pages.json`、`page_text.md`：逐页文本、选择的提取器、乱码指标和视觉读取状态；
+- `image_manifest.csv`、`unique_image_manifest.csv`、`images/`：图片出现位置与去重图片；
+- `rendered_pages/`：仅包含文本为空或疑似乱码的页面；
+- `created_files.json`：本次创建的文件、目录和安全清理边界。
+
+中文文本优先由 `pypdf` 提取；只有它不合格且 PyMuPDF 结果更好时才逐页降级。两种文本都为空或疑似乱码时，正文只保留“需视觉读取”占位，不把乱码写入 wiki。
+
+清理与 PDF 读取是两个独立工作流。完成 wiki、索引和验证后，先依据 `created_files.json` 逐个删除登记文件，再按 `created_directories` 从最深层删除已确认的空目录。始终保留 `tmp/`，不处理其他任务或其他工作流目录；若执行策略阻止空目录删除，保留空目录并如实报告，不能换用递归或批量命令绕过。
 
 ### 只读评估
 
@@ -306,6 +340,7 @@ $obsidian-llm-wiki 将 @wiki/路径/页面.md 从 index.md 中移出，但不要
 - `wiki/` 中包含个人、客户、课程或商业隐私的页面。
 - 项目级 `AGENTS.md`、`CLAUDE.md`、`index.md`、`log.md`。
 - 私人 vault 生成的 `logs/`、`logs/archive/` 和 `logs/log-archives.md`。
+- 私人 vault 生成的 `tmp/`、PDF 提取文本、页面渲染、图片、JSON/CSV manifest 和 `created_files.json`。
 - `.venv/`、缓存、临时文件。
 - API key、token、cookie、密钥、账号信息。
 - 本机绝对路径和个人目录结构。

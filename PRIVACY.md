@@ -13,6 +13,7 @@
 - 密钥和账号：API key、token、cookie、密码、SSH key、OAuth 凭证。
 - 本机信息：个人用户名、本机绝对路径、网盘路径、客户名称、内部项目名。
 - 临时文件：缓存、日志、导出中间产物、系统文件。
+- PDF 预处理产物：逐页提取文本、页面渲染、抽取图片、元数据、JSON/CSV manifest、`created_files.json` 及整个 `tmp/obsidian-llm-wiki/`。
 
 ## 发布前检查
 
@@ -35,8 +36,12 @@ assets/*.md
 examples/*.example.md
 references/index_stat.py
 references/log-rotation.md
+references/pdf-preprocessing.md
 references/schema.md
+references/temp-cleanup.md
 scripts/log-preflight.ps1
+scripts/preprocess_pdf.py
+requirements-llm-wiki.txt
 ```
 
 搜索敏感词和私有路径时，重点检查密钥、账号凭证、本机绝对路径、网盘目录、真实 raw/wiki 领域名和客户/课程名称。
@@ -44,6 +49,8 @@ scripts/log-preflight.ps1
 如果命中内容来自个人 vault、原始资料、本机路径或密钥，请先移除再发布。文档中的泛化安全提醒可以保留，真实凭证和真实路径不能保留。
 
 公开工具脚本必须保持通用：不得内嵌真实 vault 路径、用户名、领域名称、统计数字、客户或课程信息，也不得包含任何账号凭证。日志示例和分卷说明只能使用日期、路径和计数占位符，不得复制真实 `log.md` 条目或归档目录。
+
+PDF 功能只发布脚本、依赖声明和通用工作流说明；测试可以在仓库外读取真实 PDF，但不得把源文件名、原始文本、元数据、哈希、图片、渲染页、测试任务目录或测试结果复制进仓库。发布前必须确认暂存区不含 `.pdf`、图片、`.json`、`.csv` 或 `tmp/` 产物。
 
 ## 推荐做法
 

@@ -129,6 +129,14 @@ $obsidian-llm-wiki 优化 @wiki/项目资料/示例项目复盘.md，只追加�
 $obsidian-llm-wiki ingest @raw/项目资料/示例项目/项目复盘.pptx，先用项目 .venv 提取文本、元数据、slide 顺序和图片 manifest；必要时再用 default agents 分批读图，最终整理为 @wiki/项目资料/示例项目复盘.md。
 ```
 
+中文 PDF 使用固定预处理脚本，并在交付完成后清理本次任务目录：
+
+```text
+$obsidian-llm-wiki ingest @raw/项目资料/示例项目/示例报告.pdf，先用固定 preprocess_pdf.py 提取逐页文本、页码、元数据和图片 manifest，检测乱码并渲染异常页；完成 wiki、索引和验证后，依据 created_files.json 逐项清理本次 tmp/obsidian-llm-wiki/<task-id>/，不要处理其他任务目录。
+```
+
+清理时必须逐文件、逐空目录执行，不得使用递归、通配符、循环、管道或批量删除。执行策略阻止空目录删除时，保留空目录并报告受控残留。
+
 只做预处理评估：
 
 ```text

@@ -38,6 +38,7 @@ Run this pass before finalizing any task:
 - Never modify, move, rename, or delete anything under `raw/`.
 - Never use recursive, wildcard, piped, looped, or bulk deletion commands.
 - If a single file must be deleted, use only `Remove-Item -LiteralPath "<absolute file path>"` after confirming it is one file, not a directory, with no wildcard and no `-Recurse`.
+- Directory deletion is allowed only for the narrow temporary-task exception defined in [references/temp-cleanup.md](references/temp-cleanup.md): one verified empty directory per independent `Remove-Item -LiteralPath` command, never `-Recurse`.
 - Do not overwrite existing wiki content unless the user explicitly asks for overwrite. For optimization tasks, preserve existing content and image embeds unless the user requests restructuring.
 - Keep `log.md` append-only.
 - Keep Chinese as the primary content language unless the user asks otherwise.
@@ -99,6 +100,19 @@ The project venv is for deterministic preprocessing only:
 - Render PDF pages or PPTX slides to image files only when the user explicitly asks for generated outputs.
 - Build ordered manifests for later default-agent visual analysis.
 - Keep generated intermediate outputs outside `raw/` unless the user explicitly asks to add new source assets there.
+
+For PDF preprocessing, read and follow [references/pdf-preprocessing.md](references/pdf-preprocessing.md) and use the fixed Skill script:
+
+```powershell
+& ".\.venv\Scripts\python.exe" "<skill_base>\scripts\preprocess_pdf.py" `
+  --input "<absolute-pdf-path>" `
+  --vault-root "<absolute-vault-root>" `
+  --task-id "<timestamp-safe-task-id>"
+```
+
+The script requires the packages pinned in `requirements-llm-wiki.txt`. Never install dependencies automatically; if imports are unavailable, report the missing packages and let the user decide whether to install them into the project venv.
+
+Temporary artifact cleanup is a separate workflow. Before finalizing any successful or controlled-failure task that generated files under `tmp/obsidian-llm-wiki/<task-id>/`, read and follow [references/temp-cleanup.md](references/temp-cleanup.md). Delete registered files individually, then registered empty task directories deepest-first. Remove the empty `tmp/obsidian-llm-wiki/` container only when it has no remaining children; always retain `tmp/` and never infer deletion authority merely because a path is under it. Report remaining file count, remaining directory count, task-root state, and workflow-container state. If execution policy blocks an empty-directory removal, do not try an equivalent deletion command; report the empty directory as a controlled residual.
 
 Use `default` agents for visual understanding after preprocessing:
 

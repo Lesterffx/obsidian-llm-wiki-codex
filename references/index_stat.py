@@ -9,6 +9,9 @@ The script is read-only and uses only the Python standard library. It reports:
 indexed_page_count, wiki_file_count, registered_domain_count, missing_count,
 broken_count, duplicate_count, issue details, and footer drift.
 
+Links support wiki-prefixed paths, wiki-relative paths, and bare stems.
+Explicit paths (with optional .md) take priority; stem lookup is the fallback.
+
 Exit codes:
     0: scan completed, including scans that found health issues or drift
     2: invalid arguments or vault structure
@@ -180,11 +183,12 @@ def is_excluded_target(target: str) -> bool:
 def resolve_target(target: str, wiki_files: list[str]) -> tuple[Optional[str], Optional[str]]:
     """Resolve a title or wiki-relative path to exactly one Markdown page."""
     normalized = target.replace("\\", "/").strip().lstrip("/")
-    if normalized.startswith("wiki/"):
+    wiki_prefixed = normalized.startswith("wiki/")
+    if wiki_prefixed:
         normalized = normalized[5:]
 
     path_candidates: set[str] = set()
-    if "/" in normalized or normalized.lower().endswith(".md"):
+    if wiki_prefixed or "/" in normalized or normalized.lower().endswith(".md"):
         relative = normalized if normalized.lower().endswith(".md") else normalized + ".md"
         candidate = "wiki/" + relative
         if candidate in wiki_files:

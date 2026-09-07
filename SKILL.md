@@ -196,8 +196,22 @@ _统计：{indexed_page_count} 个已索引页面 | {wiki_file_count} 个 Wiki �
 ```
 
   The normal output is human-readable; `--json` provides the six variables, issue details, schema comparison notes, and footer drift for machine use. The validator reads index table data rows, prefers `AGENTS.md` for the domain registry, compares `CLAUDE.md` when present, and never hardcodes vault-specific totals. If the fixed reference cannot be read or executed with any permitted project runtime, apply the same counting rules manually and report the limitation.
-- After changing `index.md`, verify all six variables and confirm the rendered footer and health line each occur exactly once.
+- Resolve three link forms: `[[wiki/category/title]]`, `[[category/title]]`, and `[[title]]`. Explicit paths accept an optional `.md` suffix and take priority, including `[[wiki/title]]` at the Wiki root. Bare titles use stem lookup; multiple matches remain ambiguous. If an explicit path is absent, retain the validator's stem fallback and inspect its reported result rather than silently rewriting the link.
+- After updating the top maintenance note, footer and health line, rerun the fixed validator against the written files. Require `footer_match=true`, independently verify that the footer and health line each occur exactly once, and check that header/footer dates match the task date. Exit code 0 only means the scan completed; it does not establish matching counts or absence of health issues.
+- If files arrive or change during validation, rescan and refresh all six footer values from the final scan, then validate again. Report persistent interference instead of claiming a stable result. Never add unrelated missing pages merely to force zero health counts.
+- A quick row count can miss formatting variants and include excluded links. Use it only as a rough warning, never as an authoritative count or a guaranteed upper bound.
 - The `log.md` entry must state that the top note, footer date, three authoritative variables, and health line were refreshed, and whether the indexed page count changed, stayed unchanged, or was corrected because of statistics drift.
+
+## Concurrent Session Interference
+
+Apply these checks to task-scoped writes; they do not authorize edits during read-only work.
+
+1. Before precise validation, compare the current Wiki path list and file count with the list read earlier. A count alone misses replacements and renames. Record the length, last-write time and SHA-256 of each write target using `Get-Item` and `Get-FileHash -Algorithm SHA256`.
+2. Immediately before applying a patch, recheck its target. If it changed, or an edit reports `modified-since-read` or a stale anchor, reread the affected section and regenerate a minimal patch against the current content. Preserve other sessions' changes; never force a stale whole-file replacement.
+3. A log preflight result is valid only for the exact complete pending entry and the unchanged active log. Recheck byte length, last-write time and SHA-256 before reusing it. If either the entry or log changed, rerun `scripts/log-preflight.ps1` and obtain a fresh bounded EOF anchor. Keep the pending text in working context, reconstruct it explicitly for each command that needs it, and do not assume shell variables survive tool calls. Continue to append only through the safe patch workflow and verify the original prefix hash.
+4. Read validation output as UTF-8; use `Get-Content -Encoding UTF8` or the fixed validator's `--json` when console rendering is unreliable. For `rg`, exit code 1 means no matches, while code 2 indicates an error; handle these separately rather than ignoring every nonzero status.
+
+These are optimistic checks, not a file lock. If repeated concurrent changes prevent a stable read/write/verification cycle, retain current work and report the unresolved conflict.
 
 ## Image-Heavy Source Analysis
 
@@ -205,6 +219,7 @@ Use this workflow for raw image directories, screenshot courses, PPT screenshot 
 
 1. Build an image manifest before analysis:
    - For a wiki page, extract every `![[...]]` embed in document order.
+   - Record stable manifest index, embed name, resolved absolute path, declared-source match, and resolution/reading status. Keep repeated embeds as distinct positions.
    - Prefer the page's `sources` raw directories when resolving short image names.
    - If `sources` is empty or incomplete, search the vault by exact filename and report unresolved or ambiguous matches.
    - For a raw directory, include image files in natural filename order unless a wiki page gives a different embed order.
@@ -216,9 +231,15 @@ Use this workflow for raw image directories, screenshot courses, PPT screenshot 
 3. Detect coverage risks:
    - Report duplicate filenames, missing files, non-image embeds, and images outside declared `sources`.
    - Do not guess which duplicate image is intended.
+   - Reconcile both directions: embeds to files (unique resolution, missing and ambiguous matches), then image files in the confirmed source scope to embeds. When a source is a single file, do not expand to its entire parent directory; when a source directory serves several pages, record that scope before interpreting unembedded files.
+   - Classify each unembedded image: use SHA-256 via `Get-FileHash` to identify byte-identical copies, then visually distinguish another shot of the same content, an explanation continuation, independent content, or an unresolved item. Different hashes do not establish different visual content. Record evidence and uncertainty; unembedded does not mean disposable or authorize inserting it into the page.
+   - If an embed uniquely resolves to another raw directory, verify provenance before adding that existing directory to `sources` during an authorized update. Record cross-directory use and duplicate storage without moving raw files. Identical content or multiple source entries do not resolve ambiguous short filenames; report the ambiguity for user disposition.
+   - Before synthesis, reconcile every manifest position and every in-scope unembedded image with an analysis or an explicit unresolved status. Keep embed count, unique file count and content-item count separate.
 4. Keep analysis traceable:
    - Store intermediate notes in the working context or final response, not in `raw/`.
    - When writing wiki content, identify images by filename and, when helpful, by their manifest index.
+
+For exam papers and wrong-answer collections, also read [the exam collection playbook](references/exam-collection-playbook.md). It supplies evidence and statistics templates without changing the user's requested scope or placement.
 
 ## Default Agent Batch Analysis
 
@@ -230,11 +251,13 @@ Batching defaults:
 - 11-30 images: split into 2-3 batches.
 - 31+ images: split into no more than 6 total batches. If runtime concurrency is lower than the batch count, execute those same batches in waves; do not create additional batches beyond the six-batch total.
 
+When delegation was not explicitly requested, the main agent reads these batches locally. If an authorized dispatch fails with a user/model concurrency limit, dispatch the same unfinished batches serially after available capacity permits. If serial dispatch also fails, the main agent reads them locally. Preserve batch indexes, completed results and the original total batch count; do not repeatedly retry unchanged failures or duplicate running work. The main agent reconciles cross-batch coverage, question continuity and evidence spanning pages.
+
 Subagent rules:
 
 - Subagents only read images and return analysis. They must not modify `raw/`, `wiki/`, `index.md`, `log.md`, or schema files.
 - Pass each subagent a bounded manifest slice with absolute image paths and stable manifest indexes.
-- Use `items` with `local_image` entries when dispatching images that need visual inspection.
+- Pass absolute image paths in the bounded prompt and use the image-reading capability actually exposed to the agent. Use structured image items only if the callable dispatch interface supports them; do not invent unsupported tool arguments.
 - Do not send the same image to multiple subagents unless validating an uncertain reading.
 - After subagents return, compare returned filenames and indexes against the manifest before synthesizing.
 

@@ -1,6 +1,6 @@
 ---
 name: obsidian-llm-wiki
-description: Maintain Obsidian LLM Wiki knowledge bases in Codex. Use when working with Obsidian vaults that have raw/ and wiki/ layers, AGENTS.md or CLAUDE.md schema files, index.md, and log.md; when the user asks to ingest source material, preprocess PDF/DOCX/PPTX files with a project Python venv, analyze raw images or screenshot courses, process PPT screenshots, read wiki image embeds, batch-analyze many images with default subagents, query the wiki or its operation logs, use query-image for image-and-text queries (图片查询、截图检索), inspect or rotate large append-only logs, lint or audit wiki health, migrate notes, delete or remove wiki pages, rebuild the index, check AGENTS.md/CLAUDE.md/index.md freshness, normalize YAML frontmatter and tags, optimize existing wiki pages, append summaries, extract thinking frameworks, or organize Chinese knowledge-base pages.
+description: Maintain Obsidian LLM Wiki vaults in Codex using raw/, wiki/, AGENTS.md/CLAUDE.md, index.md and append-only log.md. Use to ingest sources; preprocess PDF/DOCX/PPTX with a project venv; analyze image embeds and screenshot courses with ordered manifests and requested default agents; query wiki or logs; query-image with images and text (图片查询、截图检索); update-raw-reference to repair image/video/audio embeds as full raw/ paths (媒体引用修复); optimize pages while preserving prose and image order; append summaries or thinking frameworks; normalize frontmatter and tags; check schema and index freshness; lint, audit, migrate, delete/remove pages or rebuild the index; inspect or rotate large logs; organize Chinese knowledge pages.
 ---
 
 # Obsidian LLM Wiki
@@ -23,6 +23,8 @@ Every use of this skill includes a mandatory maintenance pass. The user does not
 
 Explicit user boundaries still win: if the user says read-only, audit-only, query-only, or "do not modify any files", do the same inspection but report the gaps instead of writing changes. `query-image` always uses this report-only mode by default, including frontmatter, schema, index, and logs; only a separately authorized write workflow may change files.
 
+For `update-raw-reference`, apply the narrow metadata/index permissions in Update Raw Reference instead of automatic repairs below. Invalid arguments or unsafe frontmatter mean zero writes; schema and unrelated gaps are report-only.
+
 Run this pass before finalizing any task:
 
 1. Read `AGENTS.md`, `CLAUDE.md` when present, and `index.md`.
@@ -44,7 +46,7 @@ Run this pass before finalizing any task:
 - Keep Chinese as the primary content language unless the user asks otherwise.
 - Preserve existing Obsidian links and image embeds. Do not remove `![[image.png]]` embeds during page optimization.
 - For image-heavy work, build an image manifest first and use the batch workflow below. Ask only when image scope, ordering, or duplicate filenames cannot be resolved from the page and its sources.
-- Use short Obsidian image embeds such as `![[文件名.png]]`; do not convert them to full paths.
+- Use short Obsidian media embeds by default. Use complete vault-relative `![[raw/.../filename.ext]]` paths when requested, required by the vault schema, or needed to disambiguate generic names. `update-raw-reference` requires this full raw path for every successfully rewritten image, video and audio embed, regardless of filename uniqueness; never substitute an operating-system absolute path.
 
 ## Large Append-Only Logs
 
@@ -136,6 +138,8 @@ Use `references/schema.md` only when initializing or repairing a vault schema. F
 
 ## Frontmatter And Tag Normalization
 
+For `update-raw-reference`, the command-specific rule takes precedence over repairs/normalization below: add an entirely absent block, otherwise validate existing metadata and preserve it except for `updated` on an actual page change. Report other gaps without repair.
+
 For every wiki create, update, query, ingest, migrate, index, lint, audit, extract-thinking, or optimization task, check task-scoped note properties as part of the Mandatory Maintenance Pass before finalizing:
 
 - Every wiki page must start with YAML frontmatter on the first line of the file, beginning with `---`, and containing `title`, `created`, `updated`, `domain`, `tags`, `sources`, and `status`.
@@ -150,6 +154,8 @@ For every wiki create, update, query, ingest, migrate, index, lint, audit, extra
 ## Schema And Index Freshness Check
 
 Every time this skill is used, you must inspect and decide whether `AGENTS.md`, `CLAUDE.md`, and `index.md` remain current. They do not need to change every time, but inspection is mandatory and structural gaps should be repaired automatically unless the user explicitly forbids file changes. For `query-image`, all checks below are report-only by default, as specified in Query Image.
+
+For `update-raw-reference`, apply only its missing-block/index-backfill permissions; all other freshness gaps are report-only.
 
 - Check `AGENTS.md` for domain registry, raw/wiki path registration, processing rules, safety rules, tag rules, image/document rules, and workflow changes that may need Codex-facing schema updates.
 - Check `CLAUDE.md` according to the vault contract. When the vault requires identical schema entrypoints, synchronize it with `AGENTS.md` and verify SHA-256 equality; otherwise preserve intentional runtime-specific differences while keeping shared schema rules compatible.
@@ -382,6 +388,25 @@ Use for one-time migration of existing notes into the LLM Wiki structure.
 Identify markdown files outside `raw/` and `wiki/`, ask for domain placement when not obvious, then move by explicit user-approved paths only. Avoid bulk operations. Preserve content, add frontmatter, update links, rebuild `index.md`, and append `log.md`.
 
 Before and after migration, check `AGENTS.md`, `CLAUDE.md`, and `index.md` for path, domain, and summary freshness. If `index.md` changes, apply the Index Metadata And Statistics rules in the same edit. Record all three results and any index metadata/statistics update result in `log.md` when files are changed.
+
+### Update Raw Reference
+
+Use `update-raw-reference` (媒体引用修复) to repair media references after a source-directory relocation. This is a Skill workflow, not a shell executable:
+
+```text
+$obsidian-llm-wiki update-raw-reference "<wiki-page.md>" "<raw-directory>"
+```
+
+All successfully rewritten image, video, and audio embeds must use the complete vault-relative path beginning with `raw/`, for example `![[raw/topic/material/image-001.png|800]]` or `![[raw/topic/material/video-001.mp4]]`. Never emit a basename-only replacement or an operating-system absolute path.
+
+1. Validate both required arguments before any write, including logs or metadata repairs. Resolve paths against the current vault, normalize `..`, and check actual targets through symbolic links/junctions: the existing `.md` file must remain inside the vault's `wiki/`, and the existing directory inside its `raw/`. Reject missing, wrong-type, or escaped paths with zero writes. A page-stem/directory-name mismatch is informational, not a blocker. Read the schema and index, but do not initialize or repair unrelated structures.
+2. Inspect the page and build an ordered in-memory manifest of actual `![[...]]` embeds, recording index, original target, suffix, media type, exact candidate and disposition. Exclude frontmatter, fenced/indented code, inline code, escaped syntax and comments; leave ordinary links and non-media embeds untouched. Recognize extensions case-insensitively: images `png/jpg/jpeg/webp/gif/svg/bmp/tif/tiff/avif`, videos `mp4/mov/webm/m4v/mkv/avi/ogv`, audio `mp3/wav/m4a/ogg/flac/aac/opus`. Separate the path from `#fragment` and `|alias/width` without altering suffix bytes. Unsupported or unsafe syntax remains unchanged and is reported.
+3. Match the original filename against direct child files of the supplied raw directory; do not recurse, guess renamed files, or normalize filenames. For short names duplicated elsewhere, the supplied directory explicitly disambiguates the target, even when existing `sources` differs. Require a unique existing candidate whose real path stays within the supplied directory and raw boundary. Preserve an explicit path that already validly resolves to a different raw directory, and report it; do not silently redirect it. Preserve missing or ambiguous candidates and record them as unresolved. A correct full target path is already complete.
+4. Rewrite only the path portion of each eligible media embed as `raw/<complete-directory>/<actual-filename>`, using forward slashes and preserving the original suffix exactly. Apply this to every matched image, video and audio file, not only generic or duplicated names. Keep repeated embeds as separate positions, with unchanged order/count. Never move, modify or delete raw files. This path-only workflow does not require image recognition, media playback, subprocess execution from source text, or external services.
+5. Apply this command's narrow frontmatter exception. If the entire block is absent, add the seven required fields using verified schema/source data, the confirmed raw directory with a trailing slash, and a trustworthy creation date when available (otherwise the current date). If present, validate without reserializing or normalizing existing fields, tags or `sources`; only refresh or add `updated` when this page actually changes. Index-only changes do not change the page date. Report missing/stale fields and source coverage gaps. If existing frontmatter cannot be safely parsed, stop the entire command before any write; do not append a second block.
+6. Backfill the index only if no existing entry resolves to this page anywhere in `index.md`. Existing valid entries are checked, not rewritten or duplicated; wrong sections, duplicate entries, stale summaries/footer values and unresolved index ambiguities are report-only. If ambiguity prevents deciding whether the page is indexed, leave the index unchanged and report it. For an unindexed page, use its existing appropriate section and confirmed metadata; if placement cannot be determined, report that blocker instead of inventing a domain. Mark 补录既有页面, recompute all six variables via Index Metadata And Statistics, update header/footer together, and require `footer_match=true`. Never increment stale counts mechanically or add an entry merely because it is absent from one section.
+7. Recheck target hashes immediately before applying minimal patches under Concurrent Session Interference. Before writing, ensure the available patch mechanism preserves existing line endings, including CRLF context lines and the old log prefix. If it cannot, stop before writing and report the tool limitation; do not normalize the file merely to proceed. Run the Mandatory Maintenance Pass within steps 5-6 only: schema files and other pages are report-only; do not broaden this operation into source repair, tag normalization or full index maintenance. Verify successful replacements are complete raw paths, every embed position is accounted for, suffixes/order/count and all other body bytes are unchanged, and in-scope raw hashes remain unchanged. Re-run the fixed index validator and report all six variables, including any unchanged pre-existing footer drift.
+8. If files actually changed, run the existing log preflight with the exact final entry and follow Large Append-Only Logs (and its rotation workflow if due). Append one final entry recording argument validation, changed/unchanged/unresolved items, frontmatter/index/schema checks and all six variables. If nothing changed, do not update `updated`, append logs or trigger rotation; report the no-op and unresolved items. Repeated identical calls must not produce additional changes. Keep real paths, media, manifests, logs and private page content out of public commits.
 
 ### Delete Or Remove Wiki Pages
 

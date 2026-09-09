@@ -1,7 +1,7 @@
 ---
 title: "Codex 版 obsidian-llm-wiki 实战指令手册"
 created: 2026-07-06
-updated: 2026-07-06
+updated: 2026-09-09
 domain: AI
 tags: [AI/Obsidian, 工具/Obsidian/LLM-Wiki, 工具/编程工具/Codex, type/参考]
 sources: []
@@ -43,6 +43,7 @@ status: active
 |---|---|---|
 | 新资料入库 | `ingest` | raw 来源、目标领域、是否图片或文档密集 |
 | 优化已有页面 | `优化 @wiki/...` | 保留什么、追加什么、是否读图 |
+| 固定六类文末增强 | `enhance-wiki-content "<wiki页面>" ["<raw目录>"]` | 指定 raw 才读图；已有 frontmatter 与索引跳过 |
 | 查询知识库 | `query` | 问题范围、希望引用哪些页面 |
 | 只读评估 | `只读评估` | 不写文件，只给规模、风险和处理策略 |
 | 提炼方法论 | `创建/优化提炼思维` | 来源页面、输出重点和复用场景 |
@@ -52,6 +53,8 @@ status: active
 ### 1.2 已内置规则，不必反复写
 
 最新版 Skill 默认处理：
+
+`enhance-wiki-content` 是以下自动修复规则的例外：已有 frontmatter（含 `updated`）和有效索引只验证，不修改；整块 frontmatter 缺失或页面未收录才补。Schema 与其他页面只检查。只给页面参数时不读图或 raw 内容。
 
 - 检查并补齐 YAML frontmatter。
 - 规范化 frontmatter tags 与 inline tags，标签片段中的空格会替换为 `_`。
@@ -87,6 +90,7 @@ default agents 不是传统 OCR。它们更适合“可见文字读取 + 图表/
 | 命令 | 用途 |
 |---|---|
 | `ingest <source>` | 摄入 raw 新来源并创建或更新 wiki 页面 |
+| `enhance-wiki-content "<wiki页面>" ["<raw目录>"]` | 保留原文及媒体，在 EOF 增补六类内容；可选 raw 图片来源 |
 | `query <问题>` | 基于现有 wiki 综合回答问题 |
 | `lint` / `audit` | 检查 frontmatter、链接、sources、孤立页面和索引 |
 | `index` | 重建或刷新知识库索引 |
@@ -110,6 +114,26 @@ $obsidian-llm-wiki ingest @raw/AI/示例 AI 工具课程/，这是截图课程�
 ```
 
 ### 3.2 优化已有页面
+
+固定六类文末增强，读取指定目录中的图片：
+
+```text
+$obsidian-llm-wiki enhance-wiki-content "wiki/AI/示例 AI 工具页面.md" "raw/AI/示例 AI 工具课程/"
+```
+
+固定六类文末增强，只依据原正文，不读图：
+
+```text
+$obsidian-llm-wiki enhance-wiki-content "wiki/项目资料/示例项目复盘.md"
+```
+
+两种形式都在原 EOF 后追加 **资料总结、洞见、方法论提炼、最佳实践、金句精选、关联 Wiki**。页面和指定的 raw 目录必须真实存在且位于当前 vault 对应层内；无效参数零写入。含空格的路径必须加引号；本例名称是虚构名称，使用前替换为你的既有页面和目录。
+
+保留原正文、链接、图片与视频等媒体引用及顺序，不改路径、不插入媒体。指定 raw 时先建立有序 image manifest，对账后分析；未指定时即使有图片和 `sources` 也只读正文。无法识别的图片明确报告，不凭文件名补写内容；视频、音频不默认播放或转录。
+
+已有 frontmatter 全部保持原样，包括 `updated`；整块缺失才在顶部补齐，字段缺口只报告，无法安全解析时停止写入。已有有效索引保持整份索引不动；确认未收录才补录该页并重算六变量。关联 Wiki 须真实存在，金句区分摘录与提炼；重复调用不重复堆叠已有内容。实际变更后只追加一次日志，无变化不改日期、不写日志。
+
+真实页面、图片、提炼内容、manifest 和测试库仅留在本地，不复制到公开仓库或 PR 描述。
 
 允许整理页面结构：
 

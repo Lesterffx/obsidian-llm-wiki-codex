@@ -50,6 +50,28 @@ Codex 版在这个思路上做了进一步适配：它可以结合项目内 Pyth
 
 ## Codex 版功能特点
 
+- **延后同步与队列合并**：五种页面写命令支持 `--defer`，页面完成后写专属片段；批次末尾 `sync` 统一维护索引、统计和日志，`sync --dry-run` 零写入。详见 [defer/sync SOP](references/defer-sync.md)。
+
+### 批量任务：defer → sync
+
+```text
+$obsidian-llm-wiki enhance-wiki-content --defer "wiki/<领域>/<页面>.md" ["raw/<领域>/<资料>/"]
+$obsidian-llm-wiki optimize --defer "wiki/<领域>/<页面>.md"
+$obsidian-llm-wiki update-raw-reference --defer "wiki/<领域>/<页面>.md" "raw/<领域>/<资料>/"
+$obsidian-llm-wiki ingest --defer "raw/<领域>/<来源>"
+$obsidian-llm-wiki delete --defer "wiki/<领域>/<页面>.md"
+$obsidian-llm-wiki sync --dry-run
+$obsidian-llm-wiki sync
+```
+
+参数紧跟命令名，不改变原有页面保护规则。片段位于私人 vault 的 logs/queue，内含现成索引行和日志；统计滞后至 sync 属于正常状态。不同页可并行，同页必须串行；未带参数的默认流程不变。空队列已一致时零写入，缺失/冲突片段保留报告。
+
+两端均可发起合并，普通片段兼容 ZCode queue v1。要使用完整锁与恢复校验，两端调用新增的同一 helper/SOP，无需修改 ZCode 目录。直接调用旧 ZCode sync 仍有锁仅覆盖日志、删除片段受限、标题去重等差异，不保证双向行为等价，也不得与新版同时运行。
+
+新增 `references/defer-sync.md`、`assets/queue-fragment.md`、`scripts/flush_queue.py`。helper 从不自动删除；agent 逐文件验证并清理。真实 queue、锁、payload、日志、测试产物不得上传，公开测试仅用虚构内容。
+
+### 其他功能
+
 - **文末增强**：`enhance-wiki-content` 保留原正文和全部媒体嵌入，在文末补充六类内容；指定 raw 目录时先建 image manifest 再读图，仅给页面时只基于正文提炼。已有 frontmatter（包括 `updated`）和有效索引保持原样，缺失才补。
 - **完整媒体路径修复**：`update-raw-reference` 将匹配成功的图片、视频和音频嵌入统一改为 `![[raw/完整目录/文件名]]`，保留顺序和显示参数，不改动 raw 文件。
 - **图片搭配文字查询**：`query-image` 先验证视觉能力，再结合截图、图表或扫描件与可选问题检索 Wiki；默认只读，维护缺口只报告，多图自动按连续批次分析。

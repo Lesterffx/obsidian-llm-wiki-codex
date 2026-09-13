@@ -6,6 +6,8 @@ param(
     [AllowEmptyString()]
     [string]$PendingAppend = '',
 
+    [string]$PendingPlanFile = '',
+
     [ValidateScript({ $_ -gt 0 })]
     [double]$ThresholdMiB = 2,
 
@@ -17,6 +19,15 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($PendingPlanFile) {
+    if ($PendingAppend) { throw 'Use PendingAppend or PendingPlanFile, not both.' }
+    $queuePlan = Get-Content -LiteralPath $PendingPlanFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($queuePlan.phase -notin @('prepared', 'appending') -or $null -eq $queuePlan.payload) {
+        throw 'Expected a prepared sync plan with an exact payload.'
+    }
+    $PendingAppend = [string]$queuePlan.payload
+}
 
 $resolvedVaultRoot = [System.IO.Path]::GetFullPath($VaultRoot)
 if (-not [System.IO.Directory]::Exists($resolvedVaultRoot)) {

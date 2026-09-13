@@ -4,6 +4,8 @@
 
 ## 不要上传的内容
 
+- defer/sync 运行资料：真实 logs/queue 片段、.sync.lock（含页面快照及日志 payload）、所有者 token、恢复状态、清理清单、最终记录临时文件及测试运行目录。公开内容仅限通用模板、脚本、SOP 和虚构测试源码。
+
 - `raw/`：PDF、DOCX、PPTX、图片、截图、扫描件、课程资料、会议资料。
 - `wiki/`：个人知识库页面、客户资料、课程笔记、商业分析、私人总结。
 - 项目级配置：私有 vault 的 `AGENTS.md`、`CLAUDE.md`、`index.md`、`log.md`。

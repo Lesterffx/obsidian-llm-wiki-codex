@@ -9,6 +9,20 @@ Use this skill to maintain an Obsidian knowledge base where `raw/` is the immuta
 
 ## Grounding
 
+For `--defer` or `sync`, first read [references/defer-sync.md](references/defer-sync.md). This command branch overrides immediate shared-file maintenance below; ordinary calls remain unchanged.
+
+### Deferred Writes And Sync
+
+Support `--defer` immediately after `enhance-wiki-content`, `optimize`, `update-raw-reference`, `ingest`, or `delete`, preserving positional arguments. `sync` has no positional arguments; `sync --dry-run` is strictly read-only. Use [assets/queue-fragment.md](assets/queue-fragment.md).
+
+During defer, complete page-level work under each command's existing metadata/source/body restrictions, then write one private fragment per changed page or pending index action. Do not edit shared schema/index/log files, run six-variable precision scans, refresh footer/header metadata, or run log preflight. Unrelated gaps are report-only. No-op tasks create no fragment. Preserve enhance-wiki-content's existing frontmatter and its one-argument prose-only mode.
+
+Sync is the sole shared-file writer for a batch. Acquire the full-session lock before index edits; validate a fixed snapshot; merge only selected unambiguous actions; verify six variables and footer; prepare and append the exact log payload including one sync record. Only sync may use the fixed `scripts/flush_queue.py` binary append instead of the normal log patch; require unchanged historical prefix and exact payload verification. The helper never deletes files: the agent cleans each verified literal-path file separately, lock last. Dry-run creates no files/locks. An already-converged empty queue is a no-op.
+
+Queue statistics may lag until sync. Query/lint report pending coverage without independently backfilling queued pages. Different pages may run concurrently; the same page must be serialized. Both runtimes may use the common helper/SOP; legacy ZCode sync is not equivalent and must not overlap or recover a new-helper batch. See the SOP for compatibility and interrupted-cleanup recovery.
+
+### Grounding Steps
+
 Before acting, read the vault schema:
 
 1. Read `AGENTS.md` when it exists.

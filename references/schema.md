@@ -186,6 +186,14 @@ PDF 使用 Skill 固定脚本，不为每个任务生成临时解析脚本：
 
 ## 工作流
 
+### 延后同步与队列合并
+
+enhance-wiki-content、optimize、update-raw-reference、ingest、delete 可在命令名后带 `--defer`。页面级工作和验证照常，index 编辑、六变量精校、顶部维护/统计/健康行同步、日志追加延后；在 logs/queue 写专属 queue v1 片段即完成本任务。无变化且无待补录事项不入队。
+
+`sync` 无位置参数，是批次共享文件唯一写者：全流程先持锁，固定快照，兑现明确索引动作，精校、预检并准确追加片段日志及一条最终记录，验证后逐个单文件清理，最后释放锁。`sync --dry-run` 零写入；空队列已一致不修改文件。完整 SOP 见 Skill 的 references/defer-sync.md。
+
+logs/queue 非 Wiki，不计入统计；真实片段产生目录不等于预建空 logs/archive。统计滞后以最近一次 sync 为准，query/lint 不代补已有队列片段页面。同页不能并行；跨运行时完整保证需要使用同一锁 SOP，旧实现不保证行为等价。
+
 ### Ingest（摄入）
 
 1. 确认来源文件已放入 `raw/<domain>/` 对应目录。

@@ -1,7 +1,7 @@
 ---
 title: "Codex 版 obsidian-llm-wiki 实战指令手册"
 created: 2026-07-06
-updated: 2026-09-09
+updated: 2026-09-13
 domain: AI
 tags: [AI/Obsidian, 工具/Obsidian/LLM-Wiki, 工具/编程工具/Codex, type/参考]
 sources: []
@@ -13,6 +13,16 @@ status: active
 > 这是一份脱敏的公开实战手册范例。所有目录、页面和资料名称均与本仓库的初始化范例对应，可直接改成你自己的 vault 路径后使用。
 
 ## 与初始化范例配套使用
+
+批量页面任务可延后共享文件同步：
+
+```text
+$obsidian-llm-wiki enhance-wiki-content --defer "wiki/<领域>/<页面>.md"
+$obsidian-llm-wiki sync --dry-run
+$obsidian-llm-wiki sync
+```
+
+不同页面可并行，同页必须串行。片段与锁是私人资料，不得提交。五种命令、跨运行时限制和恢复流程见 [defer/sync SOP](../references/defer-sync.md)。
 
 建议先把以下文件复制到 Obsidian vault 根目录并重命名：
 

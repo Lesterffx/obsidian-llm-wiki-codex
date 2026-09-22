@@ -14,7 +14,7 @@ $obsidian-llm-wiki sync --dry-run
 
 也可用 `/obsidian-llm-wiki` 形式调用。`--defer` 紧跟命令名，位置参数不变；只有上述五种写命令接受它。sync 无位置参数，不是 shell 内建命令，由 agent 按本 SOP 执行。参数非法时零写入。
 
-本分支优先于通用维护、并发收尾、索引统计和日志立即追加要求，只改变共享文件收尾。各命令页面权限不变，尤其 enhance-wiki-content 单参数只读正文、双参数才读指定 raw/图片；已有 frontmatter（包括 updated）字节不变，六节追加在 EOF；update-raw-reference 保持窄修复范围。不带 defer 的行为不变。
+本分支优先于通用维护、并发收尾、索引统计和日志立即追加要求，只改变共享文件收尾。各命令页面权限不变，尤其 enhance-wiki-content 单参数只读正文、双参数才读指定 raw/图片；已有 frontmatter 字段（包括 updated）字节不变，缺标准字段时只补缺项，六节追加在 EOF；update-raw-reference 保持窄修复范围。不带 defer 的行为不变。
 
 ## defer 收尾
 

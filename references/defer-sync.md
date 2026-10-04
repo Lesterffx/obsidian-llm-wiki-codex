@@ -14,14 +14,14 @@ $obsidian-llm-wiki sync --dry-run
 
 也可用 `/obsidian-llm-wiki` 形式调用。`--defer` 紧跟命令名，位置参数不变；只有上述五种写命令接受它。sync 无位置参数，不是 shell 内建命令，由 agent 按本 SOP 执行。参数非法时零写入。
 
-本分支优先于通用维护、并发收尾、索引统计和日志立即追加要求，只改变共享文件收尾。各命令页面权限不变，尤其 enhance-wiki-content 单参数只读正文、双参数才读指定 raw/图片；已有 frontmatter 字段（包括 updated）字节不变，缺标准字段时只补缺项，六节追加在 EOF；update-raw-reference 保持窄修复范围。不带 defer 的行为不变。
+本分支优先于通用维护、并发收尾、索引统计和日志立即追加要求，只改变共享文件收尾。各命令页面权限不变，尤其 enhance-wiki-content 单参数只基于本页文字、双参数才读指定 raw/图片；缺标准字段时补缺项，原始 tags 缺失、为空或去重后仅零/一个有效标签时按 Skill 的稀疏标签例外补齐，并仅在新增标签时更新 updated；其他既有字段字节不变，正文仅允许独立 inline 标签区的已记录插入及 EOF 增强；update-raw-reference 保持窄修复范围。不带 defer 的行为不变。
 
 ## defer 收尾
 
 1. 读 Schema、任务页面和索引，完成页面级 frontmatter、正文、sources、链接、媒体顺序及 raw 只读验证。同页任务串行，不同页才可并行。
 2. 只读判断目标分区和索引动作，不编辑 index，不精校六变量，不同步顶部维护块/统计行/健康行，不预检或追加 log。Schema 缺口只报告，不让 defer 成为共享文件写者。
 3. 按 [queue-fragment.md](../assets/queue-fragment.md) 写 `logs/queue/<YYYYMMDD-HHMMSS>-<4位随机>-<动作>-<页面短名>.md`。检查名称未占用，碰撞重选；写后复核内容。一个片段一页，多页 ingest 分页记录；无实际变化且无待补录事项不入队。
-4. 沿用 queue v1、task/date/page/section/summary 元信息及 index-entry/log-entry 围栏。路径为 vault 相对路径，分区为既有唯一完整标题层级。普通任务提供现成三列表格行；delete 可留空 index-entry。日志必含范围/变更/维护/验证，维护注明同步延后；标题附片段唯一标识，避免同日同页碰撞。
+4. 沿用 queue v1、task/date/page/section/summary 元信息及 index-entry/log-entry 围栏。路径为 vault 相对路径，分区为既有唯一完整标题层级。普通任务提供现成三列表格行；delete 可留空 index-entry。日志必含范围/变更/维护/验证，维护注明同步延后；标题附片段唯一标识，避免同日同页碰撞。 enhance-wiki-content 实际补齐标签且已有索引时，以 `tag-sync` 为 summary 的首个动作标识（例如 `tag-sync | 稀疏标签补齐`）；index-entry 保留现有链接/摘要，仅使用页面最终标签，log-entry 记录原标签、新增标签、原索引标签列与日期变化。分区取当前唯一索引分区；无需移动页面。
 5. 页面验证及片段写入完成即收尾，报告“已入队，等待 sync”及片段路径，不把延后精校描述为已通过。页面已写而片段失败时报告未收尾，补齐本任务片段，不重新生成正文。
 
 统计滞后以最近一次 sync 为准。query/lint 报告缺口及待同步状态，不代补队列页面。logs/queue 非 Wiki，不计入统计；真实片段产生目录不等于预建空归档目录。
@@ -56,7 +56,8 @@ dry-run 只列合法/非法片段、同页冲突、锁状态，不创建目录�
 
 索引按实际页面路径解析，删除页加入解析候选，重名无法消歧则停止该片段：
 
-- enhance-wiki-content、update-raw-reference：已有只验证，未收录才补；既有重复/歧义保留待处理。
+- enhance-wiki-content：已有通常只验证；仅 summary 以 `tag-sync` 动作标识开头且 log-entry 记录本次新增标签的片段，允许同步唯一既有条目的标签列。合并前核对页面最终标签、原标签保留，以及片段与现条目的链接/摘要/分区一致；标签列已等于最终标签时视为已收敛；否则须与 log-entry 记录的原索引标签列一致才能替换。任一冲突保留片段并报告，不覆盖并发改动。未收录仍按既有规则补录，不凭标识新建分区或扩大修复。
+- update-raw-reference：已有只验证，未收录才补；既有重复/歧义保留待处理。
 - ingest：补录目标页，不改无关条目。
 - optimize：唯一目标分区内更新本任务摘要/标签，未收录才补，不移动无关条目。
 - delete：移除该页面的明确条目。

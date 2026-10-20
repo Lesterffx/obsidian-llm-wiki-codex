@@ -2,6 +2,8 @@
 
 这是一个面向 Codex 的 Obsidian LLM Wiki Skill，用来让 Codex 持续维护一个结构化的 Obsidian 知识库。
 
+以本地开发与使用版本为准，本仓库用于脱敏备份。备份 PR 保留供审阅，不自动合并，也不反向覆盖本地安装；仓库内容不包括私人知识库和运行资料。
+
 它不是把原始资料简单丢给 RAG 每次重新检索，而是让 LLM 把知识“编译”成一个可持续维护的 wiki：读取 `raw/` 中的原始资料，整理、提炼、交叉引用到 `wiki/`，并维护 `index.md`、`log.md` 和项目 schema。
 
 > 这是 Codex 版。Claude Code 版请见：[Lesterffx/obsidian-llm-wiki](https://github.com/Lesterffx/obsidian-llm-wiki)。
@@ -110,6 +112,7 @@ obsidian-llm-wiki-codex/
 │   ├── log.example.md
 │   └── prompt-handbook.example.md
 ├── references/
+│   ├── directory-batch.md
 │   ├── index_stat.py
 │   ├── log-rotation.md
 │   ├── pdf-preprocessing.md
@@ -276,7 +279,7 @@ $obsidian-llm-wiki enhance-wiki-content "wiki/<领域>/<页面>.md" "raw/<领域
 $obsidian-llm-wiki enhance-wiki-content "wiki/<领域>/<页面>.md"
 ```
 
-两种方式均按顺序在原正文末尾追加 **资料总结、洞见、方法论提炼、最佳实践、金句精选、关联 Wiki**。页面必须是当前 vault 的 `wiki/` 内既有 Markdown 文件；可选来源必须是 `raw/` 内既有目录。参数数量、类型或路径错误（含符号链接越界）时零写入，不创建目标页面或来源目录。
+两种方式均按顺序在原正文末尾追加 **资料总结、洞见、方法论提炼、最佳实践、金句精选、关联 Wiki**。第一参数必须是当前 vault 的 `wiki/` 内既有 Markdown 文件或目录；可选来源必须是 `raw/` 内既有目录。文件输入沿用单页行为，目录输入按下节规则展开。参数数量、类型或路径错误（含符号链接越界）时零写入，不创建目标页面或来源目录。
 
 - **原文保留**：除独立 inline 标签区可按稀疏标签例外追加新标签外，原正文、链接、图片、视频与音频嵌入、显示参数及顺序均保持不变，不修复媒体路径，不插入新媒体。其余新增正文仅追加到原 EOF，保留原换行符；补丁工具无法保留 CRLF 等格式或日志历史前缀时，停止写入并报告，不转换格式来继续操作。
 - **两种资料范围**：指定 raw 目录时先建有序 media manifest，对账嵌入、视频附件链接及范围内未引用媒体；图片按既有批次规则读取，视频默认按[视频读取规则](references/video-reading.md)处理，`--no-video` 跳过视频探测、读取及附属字幕查找。缺失、重名、越界或无法识别均报告，不猜测。只给页面时始终不读媒体、不读取 raw 正文，也不因 `sources` 存在而扩大来源。两种方式均不进行语音转写。
@@ -291,6 +294,29 @@ $obsidian-llm-wiki 优化 @wiki/领域/示例页面.md，不修改现有正文�
 ```
 
 一般优化遵循默认维护规则；`enhance-wiki-content` 仅允许缺失字段修复和上述稀疏标签、日期及索引标签同步例外。defer 通过现有 queue v1 片段记录 `tag-sync`，由 sync 更新标签列，不改变其他命令权限。
+
+### Wiki 目录批量处理与注意事项
+
+`enhance-wiki-content` 和 `update-raw-reference` 的第一参数为目录时，只处理其直属 `.md`，不递归进入子目录；按自然文件名顺序逐页执行，例如 `2` 排在 `10` 前。第二参数是 raw 根目录，每页只匹配其下与 Markdown 文件名去掉 `.md` 后完整同名的直属子目录，不按编号、模糊名称或列表位置配对。
+
+```text
+$obsidian-llm-wiki enhance-wiki-content "wiki/<领域>/<章节>/" "raw/<领域>/<章节>/"
+$obsidian-llm-wiki enhance-wiki-content --no-video --defer "wiki/<领域>/<章节>/" "raw/<领域>/<章节>/"
+$obsidian-llm-wiki enhance-wiki-content "wiki/<领域>/<章节>/"
+$obsidian-llm-wiki update-raw-reference --defer "wiki/<领域>/<章节>/" "raw/<领域>/<章节>/"
+```
+
+| 情形 | 文末增强 | 媒体引用修复 |
+|---|---|---|
+| 有完整同名 raw 子目录 | 沿用双参数单页规则 | 在该子目录内匹配媒体 |
+| 缺少同名 raw 子目录 | 降为单参数，仅用本页正文 | 整页跳过，不改引用、元数据、索引、日志或队列 |
+| 不提供 raw 参数 | 全部直属页面仅用本页正文 | 参数缺失，零写入 |
+
+不能使用 raw 根目录、编号相同的其他目录或其他页的来源代替。文件输入保持兼容：显式 raw 目录可与页面不同名，不追加页面名。
+
+执行前固定逐页清单，检查参数、真实路径及全部待执行页的 frontmatter；安全错误整批零写入，空目录无操作。标志沿用原适用范围，引用修复不接受 `--no-video`；不自动启用 defer、sync、子 agent 或并行。普通模式逐变化页收尾，defer 逐页入队；跳过/无变化页不生成日志或片段。最终逐页报告有效来源、模式、变化、跳过和失败，部分失败不算整批成功。
+
+详见[共用目录规则和虚构验收案例](references/directory-batch.md)。真实展开清单、匹配结果和跳过原因也属于私人资料，不复制到公开 commit 或 PR。
 
 ### 刷新索引
 
@@ -393,7 +419,7 @@ $obsidian-llm-wiki migrate @旧笔记路径/ 到 wiki/目标领域/，先评估�
 $obsidian-llm-wiki update-raw-reference "wiki/<领域>/<页面>.md" "raw/<领域>/<资料名>/"
 ```
 
-两参数必填，必须是当前 vault 中真实存在且分别位于 `wiki/`、`raw/` 内的 Markdown 文件和目录；路径越界、类型错误或缺失时零写入。页面与资料目录不同名不影响执行。
+两参数必填，必须是当前 vault 中真实存在且分别位于 `wiki/`、`raw/` 内的目标：第一参数为 Markdown 文件或目录，第二参数为目录；顶层路径越界、类型错误或缺失时零写入。单文件模式中页面与资料目录不同名不影响执行；目录模式只匹配完整同名的直属 raw 子目录，缺失则整页跳过，详见[目录规则](references/directory-batch.md)。
 
 所有匹配成功的图片、视频及音频均使用从 `raw/` 开始的完整目录路径，不只针对易重名文件，也不使用本机盘符绝对路径。例如，指定目录 `raw/领域/资料名称/`：
 
@@ -461,6 +487,8 @@ $obsidian-llm-wiki 将 @wiki/路径/页面.md 从 index.md 中移出，但不要
 公开示例应使用 `<你的 vault>`、`raw/<领域>/`、`wiki/<领域>/`、`示例页面.md` 这类占位符或虚构名称；不要把真实课程名、客户名、内部项目名、本机路径或私人页面名写入仓库。
 
 更多检查清单见 `PRIVACY.md`。
+
+目录批次的真实页面名称、raw 配对、展开清单、跳过/失败原因和测试运行产物同样不得公开。公开目录示例与验收案例只使用虚构名称，不能照抄已经执行过的私人课程任务。
 
 `query-image` 的输入截图、识别文本、manifest 和真实查询结果同样属于查询资料，不得加入公开 commit 或 PR；公开示例只使用虚构内容和路径占位符。图片默认不入库，并不代表图片不会经过模型服务处理；视觉 MCP 必须遵守已有的数据传输授权，不会为查询自动启用新的外部上传服务。
 

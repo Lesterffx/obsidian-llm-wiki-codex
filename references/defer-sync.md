@@ -16,6 +16,8 @@ $obsidian-llm-wiki sync --dry-run
 
 本分支优先于通用维护、并发收尾、索引统计和日志立即追加要求，只改变共享文件收尾。各命令页面权限不变，尤其 enhance-wiki-content 单参数只基于本页文字、双参数才读指定 raw/图片；缺标准字段时补缺项，原始 tags 缺失、为空或去重后仅零/一个有效标签时按 Skill 的稀疏标签例外补齐，并仅在新增标签时更新 updated；其他既有字段字节不变，正文仅允许独立 inline 标签区的已记录插入及 EOF 增强；update-raw-reference 保持窄修复范围。不带 defer 的行为不变。
 
+目录输入：`enhance-wiki-content` 和 `update-raw-reference` 先按[目录批量规则](directory-batch.md)只展开直属 `.md`，完成整批预检，再逐页进入本 SOP。缺失同名 raw 时 enhancement 使用单参数正文模式，reference repair 整页跳过；标志按有效子任务传递。每个变化页或待处理索引动作各写自己的片段，跳过/无变化页不入队，不自动 sync。
+
 ## defer 收尾
 
 1. 读 Schema、任务页面和索引，完成页面级 frontmatter、正文、sources、链接、媒体顺序及 raw 只读验证。同页任务串行，不同页才可并行。
